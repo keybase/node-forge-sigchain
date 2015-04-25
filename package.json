@@ -21,11 +21,15 @@
   },
   "homepage": "https://github.com/keybase/node-test-sigchain",
   "dependencies": {
+    "cson": "^3.0.1",
     "iced-error": "0.0.9",
     "iced-lock": "^1.0.1",
     "iced-logger": "0.0.6",
     "iced-runtime": "^1.0.2",
+    "iced-utils": "^0.1.22",
+    "json5": "^0.4.0",
     "kbpgp": "^2.0.9",
+    "minimist": "^1.1.1",
     "tweetnacl": "^0.13.1"
   },
   "devDependencies": {
