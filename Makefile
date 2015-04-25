@@ -17,7 +17,7 @@ lib/%.js: src/%.iced
 
 $(BUILD_STAMP): \
 	lib/main.js \
-	lib/sigchain.js
+	lib/forge.js 
 	date > $@
 
 clean:

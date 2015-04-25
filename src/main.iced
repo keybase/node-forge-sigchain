@@ -5,6 +5,7 @@ fs = require 'fs'
 {make_esc} = require 'iced-error'
 JSON5 = require 'json5'
 {drain} = require 'iced-utils'
+{Forge} = require './forge'
 
 #===================================================
 
@@ -77,17 +78,6 @@ exports.Chain = class Chain
 
 #===================================================
 
-class Forger 
-
-  constructor : ({@chain}) ->
-
-  run : (cb) ->
-    ## stubbed out for now, just parrot what we got in
-    await @chain.output JSON.stringify(@chain.get_data()), defer err
-    cb err
-
-#===================================================
-
 exports.Runner = class Runner
 
   constructor : ({}) ->
@@ -110,8 +100,8 @@ exports.Runner = class Runner
 
     for c in @_chains
       await c.load {}, esc defer()
-      f = new Forger { chain : c }
-      await f.run esc defer()
+      f = new Forge { chain : c }
+      await f.forge esc defer()
 
     cb null
 
