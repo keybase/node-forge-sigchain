@@ -117,8 +117,15 @@ class Runner
 
 #===================================================
 
-r = new Runner {}
-await r.run { argv : process.argv[2...] }, defer err
-if err?
-  console.log err.toString()
-  process.exit 2
+main = () -> 
+  r = new Runner {}
+  await r.run { argv : process.argv[2...] }, defer err
+  if err?
+    console.log err.toString()
+    process.exit 2
+  else
+    process.exit 0     
+
+#===================================================
+
+main()
