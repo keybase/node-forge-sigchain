@@ -8,7 +8,7 @@ JSON5 = require 'json5'
 
 #===================================================
 
-class Chain
+exports.Chain = class Chain
 
   #------------------------
 
@@ -51,7 +51,7 @@ class Chain
   _parse : (raw, cb) ->
     err = obj = null
     try
-      switch (f = @format.toLowerCase())
+      switch (f = @format?.toLowerCase())
         when 'json'
           obj = JSON.parse raw
         when 'cson'
@@ -88,7 +88,7 @@ class Forger
 
 #===================================================
 
-class Runner
+exports.Runner = class Runner
 
   constructor : ({}) ->
     @_files = []
@@ -117,7 +117,7 @@ class Runner
 
 #===================================================
 
-main = () -> 
+exports.main = () -> 
   r = new Runner {}
   await r.run { argv : process.argv[2...] }, defer err
   if err?
@@ -127,5 +127,3 @@ main = () ->
     process.exit 0     
 
 #===================================================
-
-main()
