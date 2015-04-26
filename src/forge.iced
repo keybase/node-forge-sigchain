@@ -14,12 +14,11 @@ exports.Forge = class Forge
     @_links = []
     @_assertions = []
     @_time = 0
+    @_start = null
     @_now = null
     @_expires = 0
-
-  #-------------------
-
-  _forge_link : ({link}, cb) -> 
+    @_seqno = 1
+    @_prev = null    
 
   #-------------------
 
@@ -29,12 +28,23 @@ exports.Forge = class Forge
 
   #-------------------
 
+  _make_key : ({km, obj}) -> 
+    k = new Key { km, ctime : @_compute_now(), expires : (obj.expires or @_expires) }
+    @_keyring[k.get_ekid().toString('hex')] = k
+    k
+
+  #-------------------
+
   _compute_time : (o) ->
     ret = if typeof(o) is 'string'
       if o is 'now' then @_compute_now()
-      else if (m = o.match /^(\+)?(\d+)$/) 
-        (if m[1]? then @_compute_now() else 0) + parseInt(m[2])
-      else null
+      else if not (m = o.match /^(\+)?(\d+)$/) then null
+      else if m[1]?
+        tmp = @_compute_now() + parseInt(m[2])
+        @_now = tmp
+        tmp
+      else
+        parseInt(m[2])
     else if typeof(o) isnt 'object' then null
     else if o.sum?
       sum = 0
@@ -49,7 +59,7 @@ exports.Forge = class Forge
 
   _init : (cb) ->
     try
-      @_time = if (t = @chain.time)? then @_compute_time(t) else @_compute_now()
+      @_start = if (t = @chain.time)? then @_compute_time(t) else @_compute_now()
       @_expires = @chain.expires or 60*60*24*364*10
       @_user = @chain.user or "tester_ralph"
     catch e
@@ -84,7 +94,7 @@ exports.Forge = class Forge
         else
           err = new Error "unknown key type: #{typ}"
     else if required then err = new Error "Required to generate key but none found"
-    key = if km? and not err? then @_make_key(km) else null
+    key = if km? and not err? then @_make_key{km, obj} else null
     cb err, key
 
   #-------------------
