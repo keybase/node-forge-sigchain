@@ -35,12 +35,20 @@ class Link
 
 #===================================================
 
+class Keyring 
+
+  constructor : () ->
+    @kid = {}
+    @label = {}
+
+#===================================================
+
 exports.Forge = class Forge
 
   #-------------------
 
   constructor : ({@chain}) ->
-    @_keyring = {}
+    @_keyring = new Keyring
     @_links = []
     @_assertions = []
     @_time = 0
@@ -65,7 +73,8 @@ exports.Forge = class Forge
 
   _make_key : ({km, obj}) -> 
     k = new Key { km, ctime : @_compute_now(), expire_in : @_get_expire_in({obj}) }
-    @_keyring[km.get_ekid().toString('hex')] = k
+    @_keyring.kid[km.get_ekid().toString('hex')] =  k
+    @_keyring.label[obj.label] = k
     k
 
   #-------------------
@@ -160,6 +169,19 @@ exports.Forge = class Forge
 
   #-------------------
 
+  _forge_subkey_link : ({linkdesc}, cb) -> 
+    esc = make_esc cb, "_forge_subkey_link"
+    await @_gen_key { obj : linkdesc, required : true }, esc defer key
+    parent = @_keyring.label[linkdesc.parent]
+    proof = new proofs.Subkey {
+      subkm : key.km
+      sig_eng : parent.km.make_sig_eng()
+      parent_kid : parent.km.get_ekid().toString 'hex'
+    }
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
