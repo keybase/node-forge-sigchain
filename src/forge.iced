@@ -153,7 +153,7 @@ exports.Forge = class Forge
         uid : @_uid
         username : @_username
     proof.seq_type = proofs.constants.seq_types.PUBLIC
-    proof._ctime = @_compute_now()
+    proof.ctime = if (t = linkdesc.ctime)? then @_compute_time(t) else @_compute_now()
     proof.expire_in = @_get_expire_in { obj : linkdesc }
 
   #-------------------
@@ -177,6 +177,19 @@ exports.Forge = class Forge
       subkm : key.km
       sig_eng : parent.km.make_sig_eng()
       parent_kid : parent.km.get_ekid().toString 'hex'
+    }
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_sibkey_link : ({linkdesc}, cb) -> 
+    esc = make_esc cb, "_forge_sibkey_link"
+    await @_gen_key { obj : linkdesc, required : true }, esc defer key
+    signer = @_keyring.label[linkdesc.signer]
+    proof = new proofs.Sibkey {
+      sibkm : key.km
+      sig_eng : signer.km.make_sig_eng()
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
