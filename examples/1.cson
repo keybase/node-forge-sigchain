@@ -1,6 +1,6 @@
 
 chain :
-  name : "max32"
+  user : "max32"
   ctime : "now"
   expire : 10000000
   links : [
