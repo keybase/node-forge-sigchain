@@ -10,8 +10,8 @@
     "type": "git",
     "url": "https://github.com/keybase/node-test-sigchain"
   },
-  "bin" : {
-    "gen-test-sigchain" : "./bin/main.js"
+  "bin": {
+    "gen-test-sigchain": "./bin/main.js"
   },
   "keywords": [
     "Keybase",
@@ -32,6 +32,7 @@
     "iced-utils": "^0.1.22",
     "json5": "^0.4.0",
     "kbpgp": "^2.0.9",
+    "keybase-proofs": "^2.0.20",
     "minimist": "^1.1.1",
     "tweetnacl": "^0.13.1"
   },

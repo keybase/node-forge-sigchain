@@ -2,6 +2,30 @@
 {make_esc} = require 'iced-error'
 {akatch,unix_time} = require('iced-utils').util
 kbpgp = require 'kbpgp'
+proofs = require 'keybase-proofs'
+{createHash} = require 'crypto'
+
+#===================================================
+
+class Key
+
+  constructor : ({@km, @expires_in, @ctime, @revoked_at}) ->
+
+#===================================================
+
+class Link 
+
+  constructor : ( {@linkdesc, @proof, @generate_res}) ->
+
+  get_payload_hash : () -> createHash('sha256').update(@generate_res.json).digest('hex')
+
+  to_json : () -> {
+    seqno : @proof.seqno
+    prev : @proof.prev
+    sig : @generate_res.armored
+    payload_hash : @get_payload_hash()
+    sig_id : @generate_res.id
+  }
 
 #===================================================
 
@@ -18,7 +42,8 @@ exports.Forge = class Forge
     @_now = null
     @_expires = 0
     @_seqno = 1
-    @_prev = null    
+    @_prev = null
+    @_user = null
 
   #-------------------
 
@@ -28,8 +53,12 @@ exports.Forge = class Forge
 
   #-------------------
 
+  _expires_in : ({obj}) -> (obj.expires_in or @_expires_in) 
+
+  #-------------------
+
   _make_key : ({km, obj}) -> 
-    k = new Key { km, ctime : @_compute_now(), expires : (obj.expires or @_expires) }
+    k = new Key { km, ctime : @_compute_now(), expires : @_expires_in({obj}) }
     @_keyring[k.get_ekid().toString('hex')] = k
     k
 
@@ -68,13 +97,13 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _forge_link : ({link}, cb) ->
-    switch link.type
-      when 'eldest' then @_forge_eldest_link {link}, cb
-      when 'subkey' then @_forge_subkey_link {link}, cb
-      when 'sibkey' then @_forge_sibkey_link {link}, cb
-      when 'revoke' then @_forge_revoke_link {link}, cb
-      else cb (new Error "unhandled link type: #{link.type}"), null
+  _forge_link : ({linkdesc}, cb) ->
+    switch linkdesc.type
+      when 'eldest' then @_forge_eldest_link {linkdesc}, cb
+      when 'subkey' then @_forge_subkey_link {linkdesc}, cb
+      when 'sibkey' then @_forge_sibkey_link {linkdesc}, cb
+      when 'revoke' then @_forge_revoke_link {linkdesc}, cb
+      else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
   #-------------------
 
@@ -94,14 +123,39 @@ exports.Forge = class Forge
         else
           err = new Error "unknown key type: #{typ}"
     else if required then err = new Error "Required to generate key but none found"
-    key = if km? and not err? then @_make_key{km, obj} else null
+    key = if km? and not err? then @_make_key {km, obj} else null
     cb err, key
 
   #-------------------
 
-  _forge_eldest_link : ({link}, cb) -> 
+  _populate_proof : ({linkdesc, proof}) ->
+    proof.seqno = @_seqno++
+    proof.prev = @_prev
+    proof.host = "keybase.io"
+    proof.user = @user
+    proof.seq_type = proofs.constants.seq_types.PUBLIC
+    proof._ctime = @_compute_now()
+    proof.expire_in = @_expires_in { obj : linkdesc }
+
+  #-------------------
+
+  _forge_eldest_link : ({linkdesc}, cb) -> 
     esc = make_esc cb, "_forge_eldest_link"
-    await @_gen_key { obj : link, required : true }, esc defer km
+    await @_gen_key { obj : linkdesc, required : true }, esc defer key
+    proof = new proofs.Eldest {
+      sig_eng : key.km.make_sig_eng()
+    }
+    await @_sign_and_commit_proof { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _sign_and_commit_link : ({linkdesc, proof}, cb) ->
+    @_populate_proof { linkdesc, proof }
+    await proof.generate esc defer generate_res
+    link = new Link { linkdesc, proof, generate_res }
+    @_prev = link.get_payload_hash()
+    @_links.push link
     cb null
 
   #-------------------
@@ -109,12 +163,12 @@ exports.Forge = class Forge
   forge : (cb) ->
     esc = make_esc cb, "Forge::forge"
     await @_init esc defer()
-    for link in @chain.links
-      await @_forge_link { links }, esc defer out
-      @_links.push out
+    for linkdesc in @chain.links
+      await @_forge_link { linkdesc }, esc defer out
 
     ## stubbed out for now, just parrot what we got in
-    await @chain.output JSON.stringify(@chain.get_data()), defer err
+    list = (link.to_json() for link in @_links)
+    await @chain.output JSON.stringify(link), defer err
     cb err
 
 #===================================================
