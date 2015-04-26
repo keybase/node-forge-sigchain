@@ -7,6 +7,11 @@ proofs = require 'keybase-proofs'
 
 #===================================================
 
+username_to_uid = (un) ->
+  return createHash('sha256').update(un).digest('hex') + "19"
+
+#===================================================
+
 class Key
 
   constructor : ({@km, @expires_in, @ctime, @revoked_at}) ->
@@ -25,6 +30,7 @@ class Link
     sig : @generate_res.armored
     payload_hash : @get_payload_hash()
     sig_id : @generate_res.id
+    payload_json : @generate_res.json
   }
 
 #===================================================
@@ -43,7 +49,7 @@ exports.Forge = class Forge
     @_expires = 0
     @_seqno = 1
     @_prev = null
-    @_user = null
+    @_username = null
 
   #-------------------
 
@@ -59,7 +65,7 @@ exports.Forge = class Forge
 
   _make_key : ({km, obj}) -> 
     k = new Key { km, ctime : @_compute_now(), expires : @_expires_in({obj}) }
-    @_keyring[k.get_ekid().toString('hex')] = k
+    @_keyring[km.get_ekid().toString('hex')] = k
     k
 
   #-------------------
@@ -88,9 +94,10 @@ exports.Forge = class Forge
 
   _init : (cb) ->
     try
-      @_start = if (t = @chain.time)? then @_compute_time(t) else @_compute_now()
-      @_expires = @chain.expires or 60*60*24*364*10
-      @_user = @chain.user or "tester_ralph"
+      @_start = if (t = @get_chain().time)? then @_compute_time(t) else @_compute_now()
+      @_expires = @get_chain().expires or 60*60*24*364*10
+      @_username = @get_chain().user or "tester_ralph"
+      @_uid = @get_chain().uid or username_to_uid @_username
     catch e
       err = e
     cb err
@@ -132,7 +139,10 @@ exports.Forge = class Forge
     proof.seqno = @_seqno++
     proof.prev = @_prev
     proof.host = "keybase.io"
-    proof.user = @user
+    proof.user = 
+      local :
+        uid : @_uid
+        username : @_username
     proof.seq_type = proofs.constants.seq_types.PUBLIC
     proof._ctime = @_compute_now()
     proof.expire_in = @_expires_in { obj : linkdesc }
@@ -145,12 +155,13 @@ exports.Forge = class Forge
     proof = new proofs.Eldest {
       sig_eng : key.km.make_sig_eng()
     }
-    await @_sign_and_commit_proof { linkdesc, proof }, esc defer()
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
   #-------------------
 
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
+    esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
     await proof.generate esc defer generate_res
     link = new Link { linkdesc, proof, generate_res }
@@ -160,15 +171,19 @@ exports.Forge = class Forge
 
   #-------------------
 
+  get_chain : () -> @chain.get_data().chain
+
+  #-------------------
+
   forge : (cb) ->
     esc = make_esc cb, "Forge::forge"
     await @_init esc defer()
-    for linkdesc in @chain.links
+    for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
 
     ## stubbed out for now, just parrot what we got in
     list = (link.to_json() for link in @_links)
-    await @chain.output JSON.stringify(link), defer err
+    await @chain.output JSON.stringify(list), defer err
     cb err
 
 #===================================================
