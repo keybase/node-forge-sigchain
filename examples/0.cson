@@ -2,7 +2,7 @@
 chain :
   user : "max32"
   ctime : "now"
-  expire : 10000000
+  expire_in : 10000000
   links : [
     {
       type : "eldest"

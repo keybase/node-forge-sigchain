@@ -14,7 +14,7 @@ username_to_uid = (un) ->
 
 class Key
 
-  constructor : ({@km, @expires_in, @ctime, @revoked_at}) ->
+  constructor : ({@km, @expire_in, @ctime, @revoked_at}) ->
 
 #===================================================
 
@@ -46,7 +46,7 @@ exports.Forge = class Forge
     @_time = 0
     @_start = null
     @_now = null
-    @_expires = 0
+    @_expire_in = 0
     @_seqno = 1
     @_prev = null
     @_username = null
@@ -59,12 +59,12 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _expires_in : ({obj}) -> (obj.expires_in or @_expires_in) 
+  _get_expire_in : ({obj}) -> (obj.expire_in or @_expire_in) 
 
   #-------------------
 
   _make_key : ({km, obj}) -> 
-    k = new Key { km, ctime : @_compute_now(), expires : @_expires_in({obj}) }
+    k = new Key { km, ctime : @_compute_now(), expire_in : @_get_expire_in({obj}) }
     @_keyring[km.get_ekid().toString('hex')] = k
     k
 
@@ -95,7 +95,7 @@ exports.Forge = class Forge
   _init : (cb) ->
     try
       @_start = if (t = @get_chain().time)? then @_compute_time(t) else @_compute_now()
-      @_expires = @get_chain().expires or 60*60*24*364*10
+      @_expire_in = @get_chain().expire_in or 60*60*24*364*10
       @_username = @get_chain().user or "tester_ralph"
       @_uid = @get_chain().uid or username_to_uid @_username
     catch e
@@ -145,7 +145,7 @@ exports.Forge = class Forge
         username : @_username
     proof.seq_type = proofs.constants.seq_types.PUBLIC
     proof._ctime = @_compute_now()
-    proof.expire_in = @_expires_in { obj : linkdesc }
+    proof.expire_in = @_get_expire_in { obj : linkdesc }
 
   #-------------------
 
