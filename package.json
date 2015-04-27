@@ -1,5 +1,5 @@
 {
-  "name": "test-sigchain",
+  "name": "forge-sigchain",
   "version": "1.0.0",
   "description": "A library for testing Keybase's sigchain-processing software",
   "main": "lib/main.js",
@@ -8,10 +8,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/keybase/node-test-sigchain"
+    "url": "https://github.com/keybase/node-forge-sigchain"
   },
   "bin": {
-    "gen-test-sigchain": "./bin/main.js"
+    "forge-sigchain": "./bin/main.js"
   },
   "keywords": [
     "Keybase",
@@ -20,9 +20,9 @@
   "author": "Maxwell Krohn",
   "license": "BSD-3-Clause",
   "bugs": {
-    "url": "https://github.com/keybase/node-test-sigchain/issues"
+    "url": "https://github.com/keybase/node-forge-sigchain/issues"
   },
-  "homepage": "https://github.com/keybase/node-test-sigchain",
+  "homepage": "https://github.com/keybase/node-forge-sigchain",
   "dependencies": {
     "cson": "^3.0.1",
     "iced-error": "0.0.9",
