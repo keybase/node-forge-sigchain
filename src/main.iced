@@ -100,8 +100,9 @@ exports.Runner = class Runner
 
     for c in @_chains
       await c.load {}, esc defer()
-      f = new Forge { chain : c }
-      await f.forge esc defer()
+      f = new Forge { chain : c.get_data().chain }
+      await f.forge esc defer out
+      await c.output JSON.stringify(out), esc defer()
 
     cb null
 

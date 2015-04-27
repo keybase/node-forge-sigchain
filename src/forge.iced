@@ -16,6 +16,8 @@ class Key
 
   constructor : ({@km, @expire_in, @ctime, @revoked_at}) ->
 
+  get_kid : () -> @km.get_ekid().toString 'hex'
+
 #===================================================
 
 class Link 
@@ -23,6 +25,8 @@ class Link
   constructor : ( {@linkdesc, @proof, @generate_res}) ->
 
   get_payload_hash : () -> createHash('sha256').update(@generate_res.json).digest('hex')
+
+  get_sig_id : () -> @generate_res.id
 
   to_json : () -> {
     seqno : @proof.seqno
@@ -41,6 +45,14 @@ class Keyring
     @kid = {}
     @label = {}
 
+  to_json : (cb) -> 
+    esc = make_esc cb, "to_json"
+    out = {}
+    for kid, key of @kid
+      await key.km.export_public {}, esc defer bundle
+      out[kid] = bundle
+    cb null, out
+
 #===================================================
 
 exports.Forge = class Forge
@@ -50,6 +62,7 @@ exports.Forge = class Forge
   constructor : ({@chain}) ->
     @_keyring = new Keyring
     @_links = []
+    @_link_tab = {}
     @_assertions = []
     @_time = 0
     @_start = null
@@ -133,9 +146,11 @@ exports.Forge = class Forge
         when 'dh'
           await kbpgp.kb.EncKeyManager.generate {}, esc defer km
         when 'pgp_rsa'
-          await kbpgp.generate_rsa { userid : @_user }, esc defer km
+          await kbpgp.KeyManager.generate_rsa { userid : @_username }, esc defer km
+          await km.sign {}, esc defer()
         when 'pgp_ecc'
-          await kbpgp.generate_ecc { userid : @_user }, esc defer km
+          await kbpgp.KeyManager.generate_ecc { userid : @_username }, esc defer km
+          await km.sign {}, esc defer()
         else
           err = new Error "unknown key type: #{typ}"
     else if required then err = new Error "Required to generate key but none found"
@@ -195,6 +210,29 @@ exports.Forge = class Forge
     cb null
 
   #-------------------
+
+  _forge_revoke_link : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_sibkey_link"
+    signer = @_keyring.label[linkdesc.signer]
+    revoke = {}
+    args = {
+      sig_eng : signer.km.make_sig_eng(),
+      revoke
+    }
+    if (key = linkdesc.revoke.key)?
+      revoke.kid = @_keyring.label[key].get_kid()
+    else if (arr = linkdedsc.revoke.keys)?
+      revoke.kids = []
+      for a in arr when (k = @_keyring.label[a].get_kid())?
+        revoke.kids.push k
+    else if (sig_id = libkdesc.revoke.sig)?
+      revoke.sig_id = @_link_tab[sig_id].get_sig_id()
+    proof = new proofs.Revoke args
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+  
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
@@ -202,11 +240,12 @@ exports.Forge = class Forge
     link = new Link { linkdesc, proof, generate_res }
     @_prev = link.get_payload_hash()
     @_links.push link
+    @_link_tab[linkdesc.label] = link
     cb null
 
   #-------------------
 
-  get_chain : () -> @chain.get_data().chain
+  get_chain : () -> @chain
 
   #-------------------
 
@@ -215,11 +254,11 @@ exports.Forge = class Forge
     await @_init esc defer()
     for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
-
-    ## stubbed out for now, just parrot what we got in
-    list = (link.to_json() for link in @_links)
-    await @chain.output JSON.stringify(list), defer err
-    cb err
+    await @_keyring.to_json esc defer keys
+    ret = 
+      chain : (link.to_json() for link in @_links)
+      keys : keys
+    cb null, ret
 
 #===================================================
 

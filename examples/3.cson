@@ -2,7 +2,7 @@
 chain :
   user : "max32"
   ctime : "now"
-  expire : 10000000
+  expire_in : 10000000
   links : [
     {
       type : "eldest"
@@ -12,6 +12,7 @@ chain :
     {
       type : "subkey"
       label : "s"
+      parent : "e"
       key : gen : "dh"
     },
     {
@@ -25,14 +26,21 @@ chain :
       label : "sub1"
       type : "subkey"
       key : gen : "dh"
+      parent : "sib1"
+    },
+    {
+      label : "pgp"
+      type : "sibkey"
+      key : gen : "pgp_ecc"
       signer : "sib1"
+      ctime : "+140"
     },
     {
       ctime : "+100"
       type : "revoke"
       signer : "sib1"
       revoke : key : "e"
-    }
+    },
   ]
 assertions : [
   { 
