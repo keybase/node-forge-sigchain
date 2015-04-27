@@ -39,6 +39,6 @@ chain :
       ctime : "+100"
       type : "revoke"
       signer : "sib1"
-      revoke : key : "e"
+      revoke : sig : "e"
     },
   ]
