@@ -42,27 +42,3 @@ chain :
       revoke : key : "e"
     },
   ]
-assertions : [
-  { 
-    type : "family",
-    time : sum : [ "now", 94 ]
-    subkeys : [ "s" ]
-    sibkeys : [ "e" ]
-    eldest : [ "e" ]
-  },
-  { 
-    type : "family"
-    time : sum : [ "now", 101 ]
-    subkeys : [ "s", "sub1" ]
-    sibkeys : [ "e", "sib1" ]
-    eldest : [ "e" ]
-  },
-  { 
-    type : "family"
-    time : sum : [ "now", 204 ]
-    subkeys : [ "s", "sub1" ]
-    sibkeys : [ "sib1" ]
-    eldest : [ "e" ]
-  }
-]
-
