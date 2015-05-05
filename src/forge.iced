@@ -20,7 +20,7 @@ class Key
 
 #===================================================
 
-class Link 
+class Link
 
   constructor : ( {@linkdesc, @proof, @generate_res}) ->
 
@@ -39,13 +39,13 @@ class Link
 
 #===================================================
 
-class Keyring 
+class Keyring
 
   constructor : () ->
     @kid = {}
     @label = {}
 
-  to_json : (cb) -> 
+  to_json : (cb) ->
     esc = make_esc cb, "to_json"
     out = {}
     for kid, key of @kid
@@ -80,11 +80,11 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _get_expire_in : ({obj}) -> (obj.expire_in or @_expire_in) 
+  _get_expire_in : ({obj}) -> (obj.expire_in or @_expire_in)
 
   #-------------------
 
-  _make_key : ({km, obj}) -> 
+  _make_key : ({km, obj}) ->
     k = new Key { km, ctime : @_compute_now(), expire_in : @_get_expire_in({obj}) }
     @_keyring.kid[km.get_ekid().toString('hex')] =  k
     @_keyring.label[obj.label] = k
@@ -163,7 +163,7 @@ exports.Forge = class Forge
     proof.seqno = @_seqno++
     proof.prev = @_prev
     proof.host = "keybase.io"
-    proof.user = 
+    proof.user =
       local :
         uid : @_uid
         username : @_username
@@ -173,7 +173,7 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _forge_eldest_link : ({linkdesc}, cb) -> 
+  _forge_eldest_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_eldest_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
     proof = new proofs.Eldest {
@@ -184,7 +184,7 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _forge_subkey_link : ({linkdesc}, cb) -> 
+  _forge_subkey_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_subkey_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
     parent = @_keyring.label[linkdesc.parent]
@@ -198,7 +198,7 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _forge_sibkey_link : ({linkdesc}, cb) -> 
+  _forge_sibkey_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_sibkey_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
     signer = @_keyring.label[linkdesc.signer]
@@ -221,18 +221,18 @@ exports.Forge = class Forge
     }
     if (key = linkdesc.revoke.key)?
       revoke.kid = @_keyring.label[key].get_kid()
-    else if (arr = linkdedsc.revoke.keys)?
+    else if (arr = linkdesc.revoke.keys)?
       revoke.kids = []
       for a in arr when (k = @_keyring.label[a].get_kid())?
         revoke.kids.push k
-    else if (sig_id = libkdesc.revoke.sig)?
+    else if (sig_id = linkdesc.revoke.sig)?
       revoke.sig_id = @_link_tab[sig_id].get_sig_id()
     proof = new proofs.Revoke args
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
   #-------------------
-  
+
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
@@ -255,7 +255,7 @@ exports.Forge = class Forge
     for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
     await @_keyring.to_json esc defer keys
-    ret = 
+    ret =
       chain : (link.to_json() for link in @_links)
       keys : keys
     cb null, ret
