@@ -1,6 +1,6 @@
 
 {make_esc} = require 'iced-error'
-{akatch,unix_time} = require('iced-utils').util
+{athrow,akatch,unix_time} = require('iced-utils').util
 kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
 {createHash} = require 'crypto'
@@ -187,7 +187,10 @@ exports.Forge = class Forge
   _forge_subkey_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_subkey_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
-    parent = @_keyring.label[linkdesc.parent]
+    parent = @_keyring.label[(ref = linkdesc.parent)]
+    unless parent?
+      err = new Error "Unknown parent '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
     proof = new proofs.Subkey {
       subkm : key.km
       sig_eng : parent.km.make_sig_eng()
@@ -201,7 +204,10 @@ exports.Forge = class Forge
   _forge_sibkey_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_sibkey_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
-    signer = @_keyring.label[linkdesc.signer]
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    unless signer?
+      err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
     proof = new proofs.Sibkey {
       sibkm : key.km
       sig_eng : signer.km.make_sig_eng()
@@ -213,20 +219,36 @@ exports.Forge = class Forge
 
   _forge_revoke_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_sibkey_link"
-    signer = @_keyring.label[linkdesc.signer]
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    unless signer?
+      err = new Error "Unknown parent '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
     revoke = {}
     args = {
       sig_eng : signer.km.make_sig_eng(),
       revoke
     }
     if (key = linkdesc.revoke.key)?
-      revoke.kid = @_keyring.label[key].get_kid()
+      unless (revoke.kid = @_keyring.label[key]?.get_kid())?
+        err = new Error "Cannot find key '#{key}' to revoke in link '#{linkdesc.label}'"
+        await athrow err, esc defer()
     else if (arr = linkdesc.revoke.keys)?
       revoke.kids = []
-      for a in arr when (k = @_keyring.label[a].get_kid())?
-        revoke.kids.push k
+      errs = []
+      for a in arr 
+        if (k = @_keyring.label[a]?.get_kid())?
+          revoke.kids.push k
+        else
+          errs.push "Failed to find revoke key '#{a}' in link '#{linkdesc.label}'"
+      if errs.length
+        err = new Error errs.join "; "
+        await athrow err, esc defer()
     else if (sig_id = linkdesc.revoke.sig)?
-      revoke.sig_id = @_link_tab[sig_id].get_sig_id()
+      unless (revoke.sig_id = @_link_tab[sig_id]?.get_sig_id())?
+        err = new Error "Cannot find sig_id '#{sig_id}' in link '#{linkdesc.label}'"
+        await athrow err, esc defer()
+    else if (raw = linkdesc.revoke.raw)?
+      args.revoke = raw
     proof = new proofs.Revoke args
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null

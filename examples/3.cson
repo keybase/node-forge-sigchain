@@ -36,6 +36,7 @@ chain :
       ctime : "+140"
     },
     {
+      label : "revoke1"
       ctime : "+100"
       type : "revoke"
       signer : "sib1"
