@@ -35,6 +35,7 @@ class Link
     payload_hash : @get_payload_hash()
     sig_id : @generate_res.id
     payload_json : @generate_res.json
+    kid: @proof.sig_eng.get_km().get_ekid().toString("hex")
   }
 
 #===================================================
