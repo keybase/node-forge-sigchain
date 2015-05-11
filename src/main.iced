@@ -1,6 +1,6 @@
 
 minimist = require 'minimist'
-CSON = require 'CSON'
+CSON = require 'cson'
 fs = require 'fs'
 {make_esc} = require 'iced-error'
 JSON5 = require 'json5'
