@@ -36,6 +36,7 @@ class Link
     sig_id : @generate_res.id
     payload_json : @generate_res.json
     kid: @proof.sig_eng.get_km().get_ekid().toString("hex")
+    ctime: @proof.ctime
   }
 
 #===================================================
