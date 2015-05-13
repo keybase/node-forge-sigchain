@@ -282,6 +282,8 @@ exports.Forge = class Forge
     ret =
       chain : (link.to_json() for link in @_links)
       keys : keys
+      uid : @_uid
+      username : @_username
     cb null, ret
 
 #===================================================
