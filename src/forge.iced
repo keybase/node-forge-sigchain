@@ -44,16 +44,16 @@ class Link
 class Keyring
 
   constructor : () ->
-    @kid = {}
+    @bundles = []
     @label = {}
 
-  to_json : (cb) ->
-    esc = make_esc cb, "to_json"
-    out = {}
-    for kid, key of @kid
-      await key.km.export_public {}, esc defer bundle
-      out[kid] = bundle
-    cb null, out
+  to_json : () ->
+    # A list of bundles allows most callers to just use the first bundle as the
+    # eldest key. Tests involving a chain reset will need to know what key
+    # index they want, but they still won't need to hardcode the eldest key.
+    # Also callers should be computing KIDs themselves, so they don't need a
+    # map.
+    @bundles
 
 #===================================================
 
@@ -86,11 +86,13 @@ exports.Forge = class Forge
 
   #-------------------
 
-  _make_key : ({km, obj}) ->
+  _make_key : ({km, obj}, cb) ->
+    esc = make_esc cb, "_make_key"
     k = new Key { km, ctime : @_compute_now(), expire_in : @_get_expire_in({obj}) }
-    @_keyring.kid[km.get_ekid().toString('hex')] =  k
+    await km.export_public {}, esc defer bundle
+    @_keyring.bundles.push(bundle)
     @_keyring.label[obj.label] = k
-    k
+    cb null, k
 
   #-------------------
 
@@ -140,7 +142,6 @@ exports.Forge = class Forge
 
   _gen_key : ({obj, required}, cb) ->
     esc = make_esc cb, "_gen_key"
-    err = null
     if (typ = obj.key?.gen)?
       switch typ
         when 'eddsa'
@@ -154,10 +155,13 @@ exports.Forge = class Forge
           await kbpgp.KeyManager.generate_ecc { userid : @_username }, esc defer km
           await km.sign {}, esc defer()
         else
-          err = new Error "unknown key type: #{typ}"
-    else if required then err = new Error "Required to generate key but none found"
-    key = if km? and not err? then @_make_key {km, obj} else null
-    cb err, key
+          await athrow (new Error "unknown key type: #{typ}"), defer()
+    else if required
+      await athrow (new Error "Required to generate key but none found"), defer()
+    key = null
+    if km?
+      await @_make_key {km, obj}, esc defer key
+    cb null, key
 
   #-------------------
 
@@ -278,10 +282,9 @@ exports.Forge = class Forge
     await @_init esc defer()
     for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
-    await @_keyring.to_json esc defer keys
     ret =
       chain : (link.to_json() for link in @_links)
-      keys : keys
+      keys : @_keyring.to_json()
       uid : @_uid
       username : @_username
     cb null, ret
