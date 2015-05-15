@@ -241,7 +241,7 @@ exports.Forge = class Forge
     else if (arr = linkdesc.revoke.keys)?
       revoke.kids = []
       errs = []
-      for a in arr 
+      for a in arr
         if (k = @_keyring.label[a]?.get_kid())?
           revoke.kids.push k
         else
@@ -249,9 +249,20 @@ exports.Forge = class Forge
       if errs.length
         err = new Error errs.join "; "
         await athrow err, esc defer()
-    else if (sig_id = linkdesc.revoke.sig)?
-      unless (revoke.sig_id = @_link_tab[sig_id]?.get_sig_id())?
-        err = new Error "Cannot find sig_id '#{sig_id}' in link '#{linkdesc.label}'"
+    else if (label = linkdesc.revoke.sig)?
+      unless (revoke.sig_id = @_link_tab[label]?.get_sig_id())?
+        err = new Error "Cannot find sig '#{label}' in link '#{linkdesc.label}'"
+        await athrow err, esc defer()
+    else if (sigs = linkdesc.revoke.sigs)?
+      revoke.sig_ids = []
+      errs = []
+      for label in sigs
+        if (id = @_link_tab[label]?.get_sig_id())?
+          revoke.sig_ids.push id
+        else
+          errs.push "Failed to find sig '#{label}' in link '#{linkdesc.label}'"
+      if errs.length
+        err = new Error errs.join "; "
         await athrow err, esc defer()
     else if (raw = linkdesc.revoke.raw)?
       args.revoke = raw
