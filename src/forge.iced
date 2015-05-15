@@ -166,13 +166,13 @@ exports.Forge = class Forge
   #-------------------
 
   _populate_proof : ({linkdesc, proof}) ->
-    proof.seqno = @_seqno++
-    proof.prev = @_prev
+    proof.seqno = linkdesc.seqno or @_seqno++
+    proof.prev = linkdesc.prev or @_prev
     proof.host = "keybase.io"
     proof.user =
       local :
-        uid : @_uid
-        username : @_username
+        uid : linkdesc.uid or @_uid
+        username : linkdesc.username or @_username
     proof.seq_type = proofs.constants.seq_types.PUBLIC
     proof.ctime = if (t = linkdesc.ctime)? then @_compute_time(t) else @_compute_now()
     proof.expire_in = @_get_expire_in { obj : linkdesc }
