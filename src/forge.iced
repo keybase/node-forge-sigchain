@@ -186,6 +186,7 @@ exports.Forge = class Forge
       sig_eng : key.km.make_sig_eng()
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    @_eldest_kid = key.km.get_ekid().toString 'hex'
     cb null
 
   #-------------------
@@ -201,6 +202,7 @@ exports.Forge = class Forge
       subkm : key.km
       sig_eng : parent.km.make_sig_eng()
       parent_kid : parent.km.get_ekid().toString 'hex'
+      eldest_kid : @_eldest_kid
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
@@ -217,6 +219,7 @@ exports.Forge = class Forge
     proof = new proofs.Sibkey {
       sibkm : key.km
       sig_eng : signer.km.make_sig_eng()
+      eldest_kid : @_eldest_kid
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
@@ -232,6 +235,7 @@ exports.Forge = class Forge
     revoke = {}
     args = {
       sig_eng : signer.km.make_sig_eng(),
+      eldest_kid : @_eldest_kid
       revoke
     }
     if (key = linkdesc.revoke.key)?
