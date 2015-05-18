@@ -7,8 +7,11 @@ proofs = require 'keybase-proofs'
 
 #===================================================
 
+UID_HEX_LEN = 32
+
 username_to_uid = (un) ->
-  return createHash('sha256').update(un).digest('hex') + "19"
+  hashlen = UID_HEX_LEN - 2
+  return createHash('sha256').update(un).digest('hex').slice(0, hashlen) + "19"
 
 #===================================================
 
