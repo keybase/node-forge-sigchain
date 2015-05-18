@@ -8,10 +8,11 @@ proofs = require 'keybase-proofs'
 #===================================================
 
 UID_HEX_LEN = 32
+UID_SUFFIX = "19"
 
 username_to_uid = (un) ->
   hashlen = UID_HEX_LEN - 2
-  return createHash('sha256').update(un).digest('hex').slice(0, hashlen) + "19"
+  return createHash('sha256').update(un).digest('hex').slice(0, hashlen) + UID_SUFFIX
 
 #===================================================
 
@@ -23,20 +24,22 @@ class Key
 
 #===================================================
 
+SIG_ID_SUFFIX = "0f"
+
 class Link
 
   constructor : ( {@linkdesc, @proof, @generate_res}) ->
 
   get_payload_hash : () -> createHash('sha256').update(@generate_res.json).digest('hex')
 
-  get_sig_id : () -> @generate_res.id
+  get_sig_id : () -> @generate_res.id + SIG_ID_SUFFIX
 
   to_json : () -> {
     seqno : @proof.seqno
     prev : @proof.prev
     sig : @generate_res.armored
     payload_hash : @get_payload_hash()
-    sig_id : @generate_res.id
+    sig_id : @get_sig_id()
     payload_json : @generate_res.json
     kid: @proof.sig_eng.get_km().get_ekid().toString("hex")
     ctime: @proof.ctime
