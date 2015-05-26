@@ -303,11 +303,19 @@ exports.Forge = class Forge
     await @_init esc defer()
     for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
+    label_kids = {}
+    for label, key of @_keyring.label
+      label_kids[label] = key.km.get_ekid().toString "hex"
+    label_sigs = {}
+    for label, link of @_link_tab
+      label_sigs[label] = link.get_sig_id()
     ret =
       chain : (link.to_json() for link in @_links)
       keys : @_keyring.to_json()
       uid : @_uid
       username : @_username
+      label_kids : label_kids
+      label_sigs : label_sigs
     cb null, ret
 
 #===================================================
