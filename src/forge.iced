@@ -138,10 +138,11 @@ exports.Forge = class Forge
 
   _forge_link : ({linkdesc}, cb) ->
     switch linkdesc.type
-      when 'eldest' then @_forge_eldest_link {linkdesc}, cb
-      when 'subkey' then @_forge_subkey_link {linkdesc}, cb
-      when 'sibkey' then @_forge_sibkey_link {linkdesc}, cb
-      when 'revoke' then @_forge_revoke_link {linkdesc}, cb
+      when 'eldest'     then @_forge_eldest_link     {linkdesc}, cb
+      when 'subkey'     then @_forge_subkey_link     {linkdesc}, cb
+      when 'sibkey'     then @_forge_sibkey_link     {linkdesc}, cb
+      when 'revoke'     then @_forge_revoke_link     {linkdesc}, cb
+      when 'pgp_update' then @_forge_pgp_update_link {linkdesc}, cb
       else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
   #-------------------
@@ -282,6 +283,18 @@ exports.Forge = class Forge
 
   #-------------------
 
+  _forge_pgp_update_link : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_pgp_update_link"
+    proof = new proofs.PGPUpdate {
+      sig_eng : @_keyring.label[linkdesc.signer].km.make_sig_eng()
+      pgpkm : @_keyring.label[linkdesc.pgp_update_key].km
+      eldest_kid : @_eldest_kid
+    }
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
@@ -301,6 +314,13 @@ exports.Forge = class Forge
   forge : (cb) ->
     esc = make_esc cb, "Forge::forge"
     await @_init esc defer()
+    if @chain.keys?
+      for name, parts of @chain.keys
+          await kbpgp.KeyManager.import_from_armored_pgp { armored : parts.public }, esc defer km
+          await km.merge_pgp_private { armored : parts.private }, esc defer()
+          k = new Key { km, ctime : @_compute_now(), expire_in : @_expire_in }
+          @_keyring.bundles.push parts.public
+          @_keyring.label[name] = k
     for linkdesc in @get_chain().links
       await @_forge_link { linkdesc }, esc defer out
     label_kids = {}
