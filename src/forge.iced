@@ -95,23 +95,42 @@ exports.Forge = class Forge
   _make_key : ({km, obj}, cb) ->
     esc = make_esc cb, "_make_key"
     k = new Key { km, ctime : @_compute_now(), expire_in : @_get_expire_in({obj}) }
-    await km.export_public {}, esc defer bundle
+    await km.export_public { regen: true }, esc defer bundle
     @_keyring.bundles.push(bundle)
     @_keyring.label[obj.label] = k
     cb null, k
 
   #-------------------
 
-  _compute_time : (o) ->
+  _compute_time_or_default : (linkdesc, field) ->
+    if field?
+      @_compute_time(field)
+    else
+      linkdesc.ctime
+
+  #-------------------
+
+  _compute_time : (o, advance=false) ->
+    # Only advance time if `advance` argument is true. We want to only
+    # advance time when processing links' ctime, not every time we
+    # deal with a time field, so one link advances time at most one
+    # time.
+
     ret = if typeof(o) is 'string'
       if o is 'now' then @_compute_now()
-      else if not (m = o.match /^(\+)?(\d+)$/) then null
+      else if not (m = o.match /^([\+-])?(\d+)$/) then null
       else if m[1]?
-        tmp = @_compute_now() + parseInt(m[2])
-        @_now = tmp
+        if m[1] == '+'
+          tmp = @_compute_now() + parseInt(m[2])
+          @_now = tmp if advance
+        else
+          tmp = @_compute_now() - parseInt(m[2])
+
         tmp
       else
-        parseInt(m[2])
+        tmp = parseInt(m[2])
+        @_now = tmp if advance
+        tmp
     else if typeof(o) isnt 'object' then null
     else if o.sum?
       sum = 0
@@ -126,7 +145,7 @@ exports.Forge = class Forge
 
   _init : (cb) ->
     try
-      @_start = if (t = @get_chain().time)? then @_compute_time(t) else @_compute_now()
+      @_start = if (t = @get_chain().ctime)? then @_compute_time(t, true) else @_compute_now()
       @_expire_in = @get_chain().expire_in or 60*60*24*364*10
       @_username = @get_chain().user or "tester_ralph"
       @_uid = @get_chain().uid or username_to_uid @_username
@@ -137,6 +156,10 @@ exports.Forge = class Forge
   #-------------------
 
   _forge_link : ({linkdesc}, cb) ->
+    # Compute time at the very beginning of link forging. Other
+    # parameters of the link might want to use "current time".
+    linkdesc.ctime = if (t = linkdesc.ctime)? then @_compute_time(t, true) else @_compute_now()
+
     switch linkdesc.type
       when 'eldest'     then @_forge_eldest_link     {linkdesc}, cb
       when 'subkey'     then @_forge_subkey_link     {linkdesc}, cb
@@ -148,6 +171,8 @@ exports.Forge = class Forge
   #-------------------
 
   _gen_key : ({obj, required}, cb) ->
+    userid = obj.userid or @_username
+
     esc = make_esc cb, "_gen_key"
     if (typ = obj.key?.gen)?
       switch typ
@@ -156,10 +181,11 @@ exports.Forge = class Forge
         when 'dh'
           await kbpgp.kb.EncKeyManager.generate {}, esc defer km
         when 'pgp_rsa'
-          await kbpgp.KeyManager.generate_rsa { userid : @_username }, esc defer km
+          await kbpgp.KeyManager.generate_rsa { userid : userid }, esc defer km
           await km.sign {}, esc defer()
         when 'pgp_ecc'
-          await kbpgp.KeyManager.generate_ecc { userid : @_username }, esc defer km
+          t = @_compute_time_or_default obj, obj.key.generated
+          await kbpgp.KeyManager.generate_ecc { userid : userid, generated: t, expire_in: { primary: obj.key.expire_in } }, esc defer km
           await km.sign {}, esc defer()
         else
           await athrow (new Error "unknown key type: #{typ}"), defer()
@@ -181,7 +207,7 @@ exports.Forge = class Forge
         uid : linkdesc.uid or @_uid
         username : linkdesc.username or @_username
     proof.seq_type = proofs.constants.seq_types.PUBLIC
-    proof.ctime = if (t = linkdesc.ctime)? then @_compute_time(t) else @_compute_now()
+    proof.ctime = linkdesc.ctime # Was already converted to "real time" in _forge_link
     proof.expire_in = @_get_expire_in { obj : linkdesc }
 
   #-------------------
@@ -285,12 +311,36 @@ exports.Forge = class Forge
 
   _forge_pgp_update_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_pgp_update_link"
+
+    key = @_keyring.label[linkdesc.pgp_update_key]
+
     proof = new proofs.PGPUpdate {
       sig_eng : @_keyring.label[linkdesc.signer].km.make_sig_eng()
-      pgpkm : @_keyring.label[linkdesc.pgp_update_key].km
+      pgpkm : key.km
       eldest_kid : @_eldest_kid
     }
+
+    # Remember current ekid to compare after updates. Our updates
+    # should not change ekid.
+    old_ekid = key.km.get_ekid()
+
+    lifespan = key.km.primary.lifespan
+    lifespan.expire_in = linkdesc.key_expire_in
+    lifespan.generated = @_compute_time linkdesc.generated if linkdesc.generated?
+
+    if uid = linkdesc.userid
+      key.km.userids[0] = new kbpgp.opkts.UserID(uid)
+
+    key.km.clear_pgp_internal_sigs()
+
+    await key.km.sign {}, esc defer()
+    await @_make_key { obj: linkdesc, km: key.km }, esc defer key
+
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+
+    unless key.km.get_ekid().equals(old_ekid)
+      await athrow new Error('update failed : different ekid'), esc defer()
+
     cb null
 
   #-------------------
@@ -316,6 +366,9 @@ exports.Forge = class Forge
     await @_init esc defer()
     if @chain.keys?
       for name, parts of @chain.keys
+        if parts.gen
+          await @_gen_key { obj: parts.gen }, esc defer()
+        else
           await kbpgp.KeyManager.import_from_armored_pgp { armored : parts.public }, esc defer km
           await km.merge_pgp_private { armored : parts.private }, esc defer()
           k = new Key { km, ctime : @_compute_now(), expire_in : @_expire_in }

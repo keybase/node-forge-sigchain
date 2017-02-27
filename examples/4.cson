@@ -1,0 +1,35 @@
+
+chain :
+  user : "zapu"
+  ctime : "1000"
+  expire_in : 10000000
+  links : [
+    {
+      # ctime implied from chain ctime = 1000
+
+      type : "eldest"
+      label : "e"
+
+      key : {
+        gen : "pgp_ecc"
+
+        # Will result in generation time of 1200, but not affect
+        # "current time". So it simulates someone uploading key
+        # from the future.
+        generated: "+200"
+      }
+
+      userid: "zapu <zapu@keybase.io>"
+
+      key_expire_in: 500 # Expires at 1000+500
+    }
+    {
+      ctime: "+1000" # Current time now: 1000 + 1000 = 2000
+      type : "pgp_update"
+      signer : "e"
+      pgp_update_key: "e"
+      label: "f"
+      userid: "zapu" # Change identity of key
+      key_expire_in: 500 # Expires at 2000+500
+    }
+  ]
