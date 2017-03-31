@@ -17,7 +17,7 @@ lib/%.js: src/%.iced
 
 $(BUILD_STAMP): \
 	lib/main.js \
-	lib/forge.js 
+	lib/forge.js
 	date > $@
 
 clean:
@@ -30,25 +30,11 @@ setup:
 coverage:
 	./node_modules/.bin/istanbul cover $(ICED) test/run.iced
 
-test: test-server test-browser
+test: test-server
 
 build: $(BUILD_STAMP)
 
-browser: $(BROWSER)
-
-$(BROWSER): lib/main.js $(BUILD_STAMP)
-	$(BROWSERIFY) -s kbpgp $< > $@
-
 test-server: $(BUILD_STAMP)
 	$(ICED) test/run.iced
-
-test-browser: $(TEST_STAMP) $(BUILD_STAMP)
-	@echo "Please visit in your favorite browser --> file://$(WD)/test/browser/index.html"
-
-$(TEST_STAMP): test/browser/test.js
-	date > $@
-
-test/browser/test.js: test/browser/main.iced $(BUILD_STAMP)
-	$(BROWSERIFY) -t icsify $< > $@
 
 .PHONY: clean setup test  test-browser coverage
