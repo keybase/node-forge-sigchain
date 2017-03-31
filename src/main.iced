@@ -31,7 +31,7 @@ exports.Chain = class Chain
 
   #------------------------
 
-  _read : (cb) -> 
+  _read : (cb) ->
     esc = make_esc cb, "_read"
     if @fh?
       await drain.drain @fh, esc defer dat
@@ -43,7 +43,7 @@ exports.Chain = class Chain
   #------------------------
 
   _guess_format : () ->
-    if (m = @file.match /^(.*)\.([^.]*)$/) 
+    if (m = @file.match /^(.*)\.([^.]*)$/)
       @stem = m[1]
       @format = m[2] unless @format
 
@@ -67,7 +67,7 @@ exports.Chain = class Chain
 
   #------------------------
 
-  output : (dat, cb) -> 
+  output : (dat, cb) ->
     if @outfh
       @outfh.write dat
     else if @stem?
@@ -84,9 +84,10 @@ exports.Runner = class Runner
     @_files = []
 
   parse_argv : ({argv}, cb) ->
-    parsed = minimist argv
+    parsed = minimist argv, { boolean : [ "c", "check" ]}
     @_files = parsed._
     @format = parsed.f or parsed.formated
+    @check_only = parsed.c or parsed.check
     cb null
 
   run : ({argv}, cb) ->
@@ -102,19 +103,19 @@ exports.Runner = class Runner
       await c.load {}, esc defer()
       f = new Forge { chain : c.get_data().chain }
       await f.forge esc defer out
-      await c.output JSON.stringify(out), esc defer()
+      await c.output JSON.stringify(out), esc defer() unless @check_only
 
     cb null
 
 #===================================================
 
-exports.main = () -> 
+exports.main = () ->
   r = new Runner {}
   await r.run { argv : process.argv[2...] }, defer err
   if err?
     console.log err.toString()
     process.exit 2
   else
-    process.exit 0     
+    process.exit 0
 
 #===================================================

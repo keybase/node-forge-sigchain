@@ -30,19 +30,30 @@ class Link
 
   constructor : ( {@linkdesc, @proof, @generate_res}) ->
 
-  get_payload_hash : () -> createHash('sha256').update(@generate_res.json).digest('hex')
+  inner_payload_json_str : () -> @generate_res.json or @generate_res.inner.str
+
+  get_payload_hash : () -> createHash('sha256').update(@inner_payload_json_str()).digest('hex')
 
   get_sig_id : () -> @generate_res.id + SIG_ID_SUFFIX
 
-  to_json : () -> {
+  to_json_full : () -> {
     seqno : @proof.seqno
     prev : @proof.prev
     sig : @generate_res.armored
     payload_hash : @get_payload_hash()
     sig_id : @get_sig_id()
-    payload_json : @generate_res.json
+    payload_json : @inner_payload_json_str()
     kid: @proof.sig_eng.get_km().get_ekid().toString("hex")
     ctime: @proof.ctime
+    sig_version : @linkdesc.version
+  }
+
+  to_json : () ->
+    if (@linkdesc.version is 2) and @linkdesc.compact then @to_json_compact()
+    else @to_json_full()
+
+  to_json_compact : () -> {
+    c2 : @generate_res.outer.toString('base64')
   }
 
 #===================================================
@@ -160,11 +171,15 @@ exports.Forge = class Forge
     # parameters of the link might want to use "current time".
     linkdesc.ctime = if (t = linkdesc.ctime)? then @_compute_time(t, true) else @_compute_now()
 
+    # Use v=1 by default, but allow for v=2 and whatever else
+    linkdesc.version = if (v = linkdesc.version)? then v else 1
+
     switch linkdesc.type
       when 'eldest'     then @_forge_eldest_link     {linkdesc}, cb
       when 'subkey'     then @_forge_subkey_link     {linkdesc}, cb
       when 'sibkey'     then @_forge_sibkey_link     {linkdesc}, cb
       when 'revoke'     then @_forge_revoke_link     {linkdesc}, cb
+      when 'track'      then @_forge_track_link      {linkdesc}, cb
       when 'pgp_update' then @_forge_pgp_update_link {linkdesc}, cb
       else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
@@ -253,6 +268,21 @@ exports.Forge = class Forge
       sibkm : key.km
       sig_eng : signer.km.make_sig_eng()
       eldest_kid : @_eldest_kid
+    }
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_track_link : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_sibkey_link"
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    unless signer?
+      err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
+    proof = new proofs.Track {
+      sig_eng : signer.km.make_sig_eng()
+      track : {"basics":{"id_version":1,"last_id_change":1424384373,"username":"t_doug"},"id":"c4c565570e7e87cafd077509abf5f619","key":{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"},"pgp_keys":[{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"}],"remote_proofs":[],"seq_tail":null}
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
@@ -348,7 +378,7 @@ exports.Forge = class Forge
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
-    await proof.generate esc defer generate_res
+    await proof.generate_versioned { version : linkdesc.version}, esc defer generate_res
     link = new Link { linkdesc, proof, generate_res }
     @_prev = link.get_payload_hash()
     @_links.push link

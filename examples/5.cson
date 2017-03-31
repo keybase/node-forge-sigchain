@@ -1,0 +1,42 @@
+
+chain :
+  user : "max32"
+  ctime : "now"
+  expire : 10000000
+  links : [
+    {
+      type : "eldest"
+      label : "e"
+      key : gen : "eddsa"
+      version : 2
+    },
+    {
+      type : "subkey"
+      label : "s"
+      key : gen : "dh"
+      parent : "e"
+      version : 2
+    },
+    {
+      label : "t1"
+      signer : "e"
+      type : "track"
+      version : 2
+      compact : true
+    }
+    {
+      ctime : "+100"
+      label : "sib1"
+      type : "sibkey"
+      key : gen : "eddsa"
+      signer : "e"
+      version : 2
+    },
+    {
+      label : "sub1"
+      type : "subkey"
+      key : gen : "dh"
+      parent : "sib1"
+      version : 2
+    }
+  ]
