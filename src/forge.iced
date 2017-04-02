@@ -16,6 +16,32 @@ username_to_uid = (un) ->
 
 #===================================================
 
+generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
+  esc = make_esc cb, "generate"
+  out = null
+  await proof._v_generate {}, esc defer()
+  await proof.generate_json {}, esc defer s, o
+  inner = { str : s, obj : o }
+  hooks.corrupt_inner? { inner }
+  await @generate_outer {inner }, esc defer outer
+  hooks.corrupt_outer? {outer, inner }
+  await @sig_eng.box outer, esc defer {pgp, raw, armored}
+  hooks.corrupt_box? { inner, outer, pgp, raw, armored }
+  {short_id, id} = make_ids raw
+  hooks.corrupt_ids? { inner, outer, pgp, raw, armored, short_id, id }
+  out = { pgp, id, short_id, raw, armored, inner, outer}
+  cb null, out
+
+#===================================================
+
+generate_proof = ({proof, linkdesc}, cb) ->
+  if (hooks = linkdesc.corrupt_v2_proof_hooks)?
+    generate_v2_with_corruption { proof, opts : {}, hooks }, cb
+  else
+    proof.generate_versioned { version : linkdesc.version}, cb
+
+#===================================================
+
 class Key
 
   constructor : ({@km, @expire_in, @ctime, @revoked_at}) ->
@@ -378,7 +404,7 @@ exports.Forge = class Forge
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
-    await proof.generate_versioned { version : linkdesc.version}, esc defer generate_res
+    await generate_proof { proof, linkdesc }, esc defer generate_res
     link = new Link { linkdesc, proof, generate_res }
     @_prev = link.get_payload_hash()
     @_links.push link
