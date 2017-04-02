@@ -49,11 +49,11 @@ class Link
   }
 
   to_json : () ->
-    if (@linkdesc.version is 2) and @linkdesc.compact then @to_json_compact()
+    if (@linkdesc.version is 2) and @linkdesc.stubbed then @to_json_stubbed()
     else @to_json_full()
 
-  to_json_compact : () -> {
-    c2 : @generate_res.outer.toString('base64')
+  to_json_stubbed : () -> {
+    s2 : @generate_res.outer.toString('base64')
   }
 
 #===================================================

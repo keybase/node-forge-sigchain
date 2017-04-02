@@ -22,7 +22,7 @@ chain :
       signer : "e"
       type : "track"
       version : 2
-      compact : true
+      stubbed : true
     }
     {
       ctime : "+100"
