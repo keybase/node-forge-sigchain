@@ -3,7 +3,8 @@
 {athrow,akatch,unix_time} = require('iced-utils').util
 kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
-{createHash} = require 'crypto'
+{prng,createHash} = require 'crypto'
+btcjs = require 'keybase-bitcoinjs-lib'
 
 #===================================================
 
@@ -210,6 +211,7 @@ exports.Forge = class Forge
       when 'revoke'     then @_forge_revoke_link     {linkdesc}, cb
       when 'track'      then @_forge_track_link      {linkdesc}, cb
       when 'pgp_update' then @_forge_pgp_update_link {linkdesc}, cb
+      when 'btc'        then @_forge_btc_link        {linkdesc}, cb
       else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
   #-------------------
@@ -318,6 +320,29 @@ exports.Forge = class Forge
 
   #-------------------
 
+  _forge_btc_link : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_sibkey_link"
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    unless signer?
+      err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
+
+    arg = {
+      sig_eng : signer.km.make_sig_eng()
+      cryptocurrency :
+        type : "bitcoin"
+        address : (new btcjs.Address prng(20), 0).toBase58Check()
+    }
+    revoke = {}
+    if linkdesc.revoke?
+      await @_forge_revoke_section { revoke, linkdesc }, esc defer()
+      arg.revoke = revoke
+    proof = new proofs.Cryptocurrency arg
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
   _forge_revoke_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_sibkey_link"
     signer = @_keyring.label[(ref = linkdesc.signer)]
@@ -330,41 +355,42 @@ exports.Forge = class Forge
       eldest_kid : @_eldest_kid
       revoke
     }
+    if (raw = linkdesc.revoke.raw)?
+      args.revoke = raw
+    else
+      await @_forge_revoke_section { linkdesc, revoke }, esc defer()
+    proof = new proofs.Revoke args
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_revoke_section : ({linkdesc, revoke}, cb) ->
+    err = null
+    errs = []
     if (key = linkdesc.revoke.key)?
       unless (revoke.kid = @_keyring.label[key]?.get_kid())?
         err = new Error "Cannot find key '#{key}' to revoke in link '#{linkdesc.label}'"
-        await athrow err, esc defer()
     else if (arr = linkdesc.revoke.keys)?
       revoke.kids = []
-      errs = []
       for a in arr
         if (k = @_keyring.label[a]?.get_kid())?
           revoke.kids.push k
         else
           errs.push "Failed to find revoke key '#{a}' in link '#{linkdesc.label}'"
-      if errs.length
-        err = new Error errs.join "; "
-        await athrow err, esc defer()
     else if (label = linkdesc.revoke.sig)?
       unless (revoke.sig_id = @_link_tab[label]?.get_sig_id())?
         err = new Error "Cannot find sig '#{label}' in link '#{linkdesc.label}'"
-        await athrow err, esc defer()
     else if (sigs = linkdesc.revoke.sigs)?
       revoke.sig_ids = []
-      errs = []
       for label in sigs
         if (id = @_link_tab[label]?.get_sig_id())?
           revoke.sig_ids.push id
         else
           errs.push "Failed to find sig '#{label}' in link '#{linkdesc.label}'"
-      if errs.length
-        err = new Error errs.join "; "
-        await athrow err, esc defer()
-    else if (raw = linkdesc.revoke.raw)?
-      args.revoke = raw
-    proof = new proofs.Revoke args
-    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
-    cb null
+    if errs.length
+      err = new Error errs.join "; "
+    cb err
 
   #-------------------
 
