@@ -16,18 +16,21 @@ username_to_uid = (un) ->
 
 #===================================================
 
+# most of this copy-pasted from keybase-proofs, but I didn't want to
+# introduce this code into that repo, since it's only for crafting
+# malicious proofs -- MK 2017/4/3
 generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
   esc = make_esc cb, "generate"
   out = null
   await proof._v_generate {}, esc defer()
   await proof.generate_json {}, esc defer s, o
   inner = { str : s, obj : o }
-  hooks.corrupt_inner? { inner }
-  await @generate_outer {inner }, esc defer outer
-  hooks.corrupt_outer? {outer, inner }
-  await @sig_eng.box outer, esc defer {pgp, raw, armored}
+  hooks.pre_generate_outer? { proof, inner }
+  await proof.generate_outer {inner }, esc defer outer
+  hooks.post_generate_outer? { proof, outer, inner }
+  await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
   hooks.corrupt_box? { inner, outer, pgp, raw, armored }
-  {short_id, id} = make_ids raw
+  {short_id, id} = proofs.make_ids raw
   hooks.corrupt_ids? { inner, outer, pgp, raw, armored, short_id, id }
   out = { pgp, id, short_id, raw, armored, inner, outer}
   cb null, out
