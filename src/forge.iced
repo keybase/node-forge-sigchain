@@ -312,6 +312,7 @@ exports.Forge = class Forge
       err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
       await athrow err, esc defer()
     proof = new proofs.Track {
+      eldest_kid : @_eldest_kid
       sig_eng : signer.km.make_sig_eng()
       track : {"basics":{"id_version":1,"last_id_change":1424384373,"username":"t_doug"},"id":"c4c565570e7e87cafd077509abf5f619","key":{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"},"pgp_keys":[{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"}],"remote_proofs":[],"seq_tail":null}
     }
@@ -332,6 +333,7 @@ exports.Forge = class Forge
       cryptocurrency :
         type : "bitcoin"
         address : (new btcjs.Address prng(20), 0).toBase58Check()
+      eldest_kid : @_eldest_kid
     }
     revoke = {}
     if linkdesc.revoke?
