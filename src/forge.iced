@@ -3,7 +3,8 @@
 {athrow,akatch,unix_time} = require('iced-utils').util
 kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
-{createHash} = require 'crypto'
+{prng,createHash} = require 'crypto'
+btcjs = require 'keybase-bitcoinjs-lib'
 
 #===================================================
 
@@ -13,6 +14,35 @@ UID_SUFFIX = "19"
 username_to_uid = (un) ->
   hashlen = UID_HEX_LEN - 2
   return createHash('sha256').update(un).digest('hex').slice(0, hashlen) + UID_SUFFIX
+
+#===================================================
+
+# most of this copy-pasted from keybase-proofs, but I didn't want to
+# introduce this code into that repo, since it's only for crafting
+# malicious proofs -- MK 2017/4/3
+generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
+  esc = make_esc cb, "generate"
+  out = null
+  await proof._v_generate {}, esc defer()
+  await proof.generate_json {}, esc defer s, o
+  inner = { str : s, obj : o }
+  hooks.pre_generate_outer? { proof, inner }
+  await proof.generate_outer {inner }, esc defer outer
+  hooks.post_generate_outer? { proof, outer, inner }
+  await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
+  hooks.corrupt_box? { inner, outer, pgp, raw, armored }
+  {short_id, id} = proofs.make_ids raw
+  hooks.corrupt_ids? { inner, outer, pgp, raw, armored, short_id, id }
+  out = { pgp, id, short_id, raw, armored, inner, outer}
+  cb null, out
+
+#===================================================
+
+generate_proof = ({proof, linkdesc}, cb) ->
+  if (hooks = linkdesc.corrupt_v2_proof_hooks)?
+    generate_v2_with_corruption { proof, opts : {}, hooks }, cb
+  else
+    proof.generate_versioned { version : linkdesc.version}, cb
 
 #===================================================
 
@@ -181,6 +211,7 @@ exports.Forge = class Forge
       when 'revoke'     then @_forge_revoke_link     {linkdesc}, cb
       when 'track'      then @_forge_track_link      {linkdesc}, cb
       when 'pgp_update' then @_forge_pgp_update_link {linkdesc}, cb
+      when 'btc'        then @_forge_btc_link        {linkdesc}, cb
       else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
   #-------------------
@@ -281,9 +312,34 @@ exports.Forge = class Forge
       err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
       await athrow err, esc defer()
     proof = new proofs.Track {
+      eldest_kid : @_eldest_kid
       sig_eng : signer.km.make_sig_eng()
       track : {"basics":{"id_version":1,"last_id_change":1424384373,"username":"t_doug"},"id":"c4c565570e7e87cafd077509abf5f619","key":{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"},"pgp_keys":[{"key_fingerprint":"23f9d8552c5d419976a8efdac11869d5bc47825f","kid":"0101bdda803b93cd728b21c588c77549e5dca960d4bcc589b4b80162ecc82f3c283b0a"}],"remote_proofs":[],"seq_tail":null}
     }
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_btc_link : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_sibkey_link"
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    unless signer?
+      err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
+      await athrow err, esc defer()
+
+    arg = {
+      sig_eng : signer.km.make_sig_eng()
+      cryptocurrency :
+        type : "bitcoin"
+        address : (new btcjs.Address prng(20), 0).toBase58Check()
+      eldest_kid : @_eldest_kid
+    }
+    revoke = {}
+    if linkdesc.revoke?
+      await @_forge_revoke_section { revoke, linkdesc }, esc defer()
+      arg.revoke = revoke
+    proof = new proofs.Cryptocurrency arg
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
@@ -301,41 +357,42 @@ exports.Forge = class Forge
       eldest_kid : @_eldest_kid
       revoke
     }
+    if (raw = linkdesc.revoke.raw)?
+      args.revoke = raw
+    else
+      await @_forge_revoke_section { linkdesc, revoke }, esc defer()
+    proof = new proofs.Revoke args
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_revoke_section : ({linkdesc, revoke}, cb) ->
+    err = null
+    errs = []
     if (key = linkdesc.revoke.key)?
       unless (revoke.kid = @_keyring.label[key]?.get_kid())?
         err = new Error "Cannot find key '#{key}' to revoke in link '#{linkdesc.label}'"
-        await athrow err, esc defer()
     else if (arr = linkdesc.revoke.keys)?
       revoke.kids = []
-      errs = []
       for a in arr
         if (k = @_keyring.label[a]?.get_kid())?
           revoke.kids.push k
         else
           errs.push "Failed to find revoke key '#{a}' in link '#{linkdesc.label}'"
-      if errs.length
-        err = new Error errs.join "; "
-        await athrow err, esc defer()
     else if (label = linkdesc.revoke.sig)?
       unless (revoke.sig_id = @_link_tab[label]?.get_sig_id())?
         err = new Error "Cannot find sig '#{label}' in link '#{linkdesc.label}'"
-        await athrow err, esc defer()
     else if (sigs = linkdesc.revoke.sigs)?
       revoke.sig_ids = []
-      errs = []
       for label in sigs
         if (id = @_link_tab[label]?.get_sig_id())?
           revoke.sig_ids.push id
         else
           errs.push "Failed to find sig '#{label}' in link '#{linkdesc.label}'"
-      if errs.length
-        err = new Error errs.join "; "
-        await athrow err, esc defer()
-    else if (raw = linkdesc.revoke.raw)?
-      args.revoke = raw
-    proof = new proofs.Revoke args
-    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
-    cb null
+    if errs.length
+      err = new Error errs.join "; "
+    cb err
 
   #-------------------
 
@@ -378,7 +435,7 @@ exports.Forge = class Forge
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
-    await proof.generate_versioned { version : linkdesc.version}, esc defer generate_res
+    await generate_proof { proof, linkdesc }, esc defer generate_res
     link = new Link { linkdesc, proof, generate_res }
     @_prev = link.get_payload_hash()
     @_links.push link

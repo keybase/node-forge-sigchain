@@ -6,6 +6,7 @@ fs = require 'fs'
 JSON5 = require 'json5'
 {drain} = require 'iced-utils'
 {Forge} = require './forge'
+ics = require 'iced-coffee-script'
 
 #===================================================
 
@@ -59,6 +60,8 @@ exports.Chain = class Chain
           obj = CSON.parse raw
         when 'json5'
           obj = JSON5.parse raw
+        when 'iced'
+          obj = ics.eval raw.toString()
         else
           err = new Error "unknown format: #{f}"
     catch e
