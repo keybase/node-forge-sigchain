@@ -24,7 +24,9 @@ generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
   esc = make_esc cb, "generate"
   out = null
   await proof._v_generate {}, esc defer()
-  await proof.generate_json {}, esc defer s, o
+  generate_inner_arg = { version : 2 }
+  hooks.pre_generate_inner? { generate_inner_arg }
+  await proof.generate_json generate_inner_arg, esc defer s, o
   inner = { str : s, obj : o }
   hooks.pre_generate_outer? { proof, inner }
   await proof.generate_outer {inner }, esc defer outer
@@ -62,7 +64,8 @@ class Link
 
   inner_payload_json_str : () -> @generate_res.json or @generate_res.inner.str
 
-  get_payload_hash : () -> createHash('sha256').update(@inner_payload_json_str()).digest('hex')
+  get_payload_hash : () ->
+    createHash('sha256').update(@generate_res.outer or @inner_payload_json_str()).digest('hex')
 
   get_sig_id : () -> @generate_res.id + SIG_ID_SUFFIX
 
