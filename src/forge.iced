@@ -34,8 +34,8 @@ generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
   await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
   hooks.corrupt_box? { inner, outer, pgp, raw, armored }
   {short_id, id} = proofs.make_ids raw
-  hooks.corrupt_ids? { inner, outer, pgp, raw, armored, short_id, id }
-  out = { pgp, id, short_id, raw, armored, inner, outer}
+  out = { inner, outer, pgp, raw, armored, short_id, id }
+  hooks.corrupt_ids? out
   cb null, out
 
 #===================================================

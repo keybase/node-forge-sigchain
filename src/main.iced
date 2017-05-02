@@ -47,7 +47,7 @@ exports.Chain = class Chain
   _guess_format : () ->
     if (m = @file.match /^(.*)\.([^.]*)$/)
       @stem = path.basename m[1]
-      @outdir = path.dirname m[1] unless @outdir
+      @dir or= (path.dirname(m[1]) or '.')
       @format = m[2] unless @format
 
   #------------------------
