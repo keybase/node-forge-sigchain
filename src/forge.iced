@@ -20,7 +20,7 @@ username_to_uid = (un) ->
 # most of this copy-pasted from keybase-proofs, but I didn't want to
 # introduce this code into that repo, since it's only for crafting
 # malicious proofs -- MK 2017/4/3
-generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
+generate_v2_with_corruption = ({links,proof, opts, hooks}, cb) ->
   esc = make_esc cb, "generate"
   out = null
   await proof._v_generate {}, esc defer()
@@ -29,20 +29,20 @@ generate_v2_with_corruption = ({proof, opts, hooks}, cb) ->
   await proof.generate_json generate_inner_arg, esc defer s, o
   inner = { str : s, obj : o }
   hooks.pre_generate_outer? { proof, inner }
-  await proof.generate_outer {inner }, esc defer outer
-  hooks.post_generate_outer? { proof, outer, inner }
+  await proof.generate_outer { inner }, esc defer outer, outer_unpacked
+  hooks.post_generate_outer? { links, proof, outer, inner }
   await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
   hooks.corrupt_box? { inner, outer, pgp, raw, armored }
   {short_id, id} = proofs.make_ids raw
-  out = { inner, outer, pgp, raw, armored, short_id, id }
+  out = { inner, outer, pgp, raw, armored, short_id, id, links, outer_unpacked }
   hooks.corrupt_ids? out
   cb null, out
 
 #===================================================
 
-generate_proof = ({proof, linkdesc}, cb) ->
+generate_proof = ({links, proof, linkdesc}, cb) ->
   if (hooks = linkdesc.corrupt_v2_proof_hooks)?
-    generate_v2_with_corruption { proof, opts : {}, hooks }, cb
+    generate_v2_with_corruption { links, proof, opts : {}, hooks }, cb
   else
     proof.generate_versioned { version : linkdesc.version}, cb
 
@@ -64,8 +64,8 @@ class Link
 
   inner_payload_json_str : () -> @generate_res.json or @generate_res.inner.str
 
-  get_payload_hash : () ->
-    createHash('sha256').update(@generate_res.outer or @inner_payload_json_str()).digest('hex')
+  get_payload_hash : (enc = 'hex') ->
+    createHash('sha256').update(@generate_res.outer or @inner_payload_json_str()).digest(enc)
 
   get_sig_id : () -> @generate_res.id + SIG_ID_SUFFIX
 
@@ -438,7 +438,7 @@ exports.Forge = class Forge
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
     esc = make_esc cb, "_sign_and_commit_link"
     @_populate_proof { linkdesc, proof }
-    await generate_proof { proof, linkdesc }, esc defer generate_res
+    await generate_proof { links: @_link_tab, proof, linkdesc }, esc defer generate_res
     link = new Link { linkdesc, proof, generate_res }
     @_prev = link.get_payload_hash()
     @_links.push link
