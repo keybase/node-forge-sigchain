@@ -7,6 +7,7 @@ JSON5 = require 'json5'
 {drain} = require 'iced-utils'
 {Forge} = require './forge'
 ics = require 'iced-coffee-script'
+path = require 'path'
 
 #===================================================
 
@@ -14,7 +15,7 @@ exports.Chain = class Chain
 
   #------------------------
 
-  constructor : ({@file, @fh, @format, @outfh}) ->
+  constructor : ({@file, @fh, @format, @outfh, @dir}) ->
     @_raw = null
     @_dat = null
 
@@ -45,7 +46,8 @@ exports.Chain = class Chain
 
   _guess_format : () ->
     if (m = @file.match /^(.*)\.([^.]*)$/)
-      @stem = m[1]
+      @stem = path.basename m[1]
+      @outdir = path.dirname m[1] unless @outdir
       @format = m[2] unless @format
 
   #------------------------
@@ -70,11 +72,15 @@ exports.Chain = class Chain
 
   #------------------------
 
+  outfile_name : () -> path.join @dir, @stem + ".json"
+
+  #------------------------
+
   output : (dat, cb) ->
     if @outfh
       @outfh.write dat
     else if @stem?
-      await fs.writeFile "#{@stem}.chain", dat, defer err
+      await fs.writeFile @outfile_name(), dat, defer err
     else
       err = new Error 'no output possible'
     cb err
@@ -87,10 +93,12 @@ exports.Runner = class Runner
     @_files = []
 
   parse_argv : ({argv}, cb) ->
-    parsed = minimist argv, { boolean : [ "c", "check" ]}
+    parsed = minimist argv, { boolean : [ "c", "check", "p", "pretty" ]}
     @_files = parsed._
-    @format = parsed.f or parsed.formated
+    @format = parsed.f or parsed.format
     @check_only = parsed.c or parsed.check
+    @dir = parsed.d or parsed.dir
+    @pretty = parsed.p or parsed.pretty
     cb null
 
   run : ({argv}, cb) ->
@@ -98,7 +106,7 @@ exports.Runner = class Runner
     await @parse_argv {argv}, esc defer()
 
     if @_files.length
-      @_chains = (new Chain { file : f, @format } for f in @_files)
+      @_chains = (new Chain { file : f, @format, @dir } for f in @_files)
     else
       @_chains = [ new Chain { fh : process.stdin, @format, outfh : process.stdout } ]
 
@@ -106,7 +114,8 @@ exports.Runner = class Runner
       await c.load {}, esc defer()
       f = new Forge { chain : c.get_data().chain }
       await f.forge esc defer out
-      await c.output JSON.stringify(out), esc defer() unless @check_only
+      out = JSON.stringify(out, null, (if @pretty then 4 else null))
+      await c.output out, esc defer() unless @check_only
 
     cb null
 
