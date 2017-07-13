@@ -3,8 +3,11 @@
 {athrow,akatch,unix_time} = require('iced-utils').util
 kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
+constants = proofs.constants
 {prng,createHash} = require 'crypto'
 btcjs = require 'keybase-bitcoinjs-lib'
+pgp_utils = require('pgp-utils')
+{json_stringify_sorted} = pgp_utils.util
 
 #===================================================
 
@@ -39,10 +42,34 @@ generate_v2_with_corruption = ({links,proof, opts, hooks}, cb) ->
   cb null, out
 
 #===================================================
+    
+# Unlike v2 corrupt hooks, these hooks only accept the object, not the
+# json str for obj/str consistency.
+generate_v1_with_corruption = ({links,proof,opts,hooks}, cb) ->
+  esc = make_esc cb, "generate"
+  out = null
+  opts = version : constants.versions.sig_v1
+  await proof._v_generate opts, esc defer()
+  await proof.generate_json opts, esc defer json, json_obj
+  
+  if hooks?.corrupt?
+    hooks.corrupt {proof : proof, obj : json_obj}
+    json = json_stringify_sorted json_obj
+
+  inner = { str : json, obj : json_obj }
+
+  await proof.sig_eng.box json, esc defer {pgp, raw, armored}
+  {short_id, id} = proofs.make_ids raw
+  out = { pgp, json, id, short_id, raw, armored, inner }
+  cb null, out
+
+#===================================================
 
 generate_proof = ({links, proof, linkdesc}, cb) ->
   if (hooks = linkdesc.corrupt_v2_proof_hooks)?
     generate_v2_with_corruption { links, proof, opts : {}, hooks }, cb
+  else if (hooks = linkdesc.corrupt_v1_proof_hooks)? # v1 hooks
+    generate_v1_with_corruption { links, proof, opts : {}, hooks }, cb
   else
     proof.generate_versioned { version : linkdesc.version}, cb
 
@@ -208,13 +235,14 @@ exports.Forge = class Forge
     linkdesc.version = if (v = linkdesc.version)? then v else 1
 
     switch linkdesc.type
-      when 'eldest'     then @_forge_eldest_link     {linkdesc}, cb
-      when 'subkey'     then @_forge_subkey_link     {linkdesc}, cb
-      when 'sibkey'     then @_forge_sibkey_link     {linkdesc}, cb
-      when 'revoke'     then @_forge_revoke_link     {linkdesc}, cb
-      when 'track'      then @_forge_track_link      {linkdesc}, cb
-      when 'pgp_update' then @_forge_pgp_update_link {linkdesc}, cb
-      when 'btc'        then @_forge_btc_link        {linkdesc}, cb
+      when 'eldest'       then @_forge_eldest_link     {linkdesc}, cb
+      when 'subkey'       then @_forge_subkey_link     {linkdesc}, cb
+      when 'sibkey'       then @_forge_sibkey_link     {linkdesc}, cb
+      when 'revoke'       then @_forge_revoke_link     {linkdesc}, cb
+      when 'track'        then @_forge_track_link      {linkdesc}, cb
+      when 'pgp_update'   then @_forge_pgp_update_link {linkdesc}, cb
+      when 'btc'          then @_forge_btc_link        {linkdesc}, cb
+      when 'per_user_key' then @_forge_per_user_key    {linkdesc}, cb
       else cb (new Error "unhandled link type: #{linkdesc.type}"), null
 
   #-------------------
@@ -432,7 +460,32 @@ exports.Forge = class Forge
       await athrow new Error('update failed : different ekid'), esc defer()
 
     cb null
+  
+  #-------------------
 
+  _forge_per_user_key : ({linkdesc}, cb) ->
+    esc = make_esc cb, "_forge_per_user_key"
+    signer = @_keyring.label[(ref = linkdesc.signer)]
+    await @_gen_key { obj: {key: {gen: 'eddsa'}}, required: true}, esc defer skm
+    await @_gen_key { obj: {key: {gen: 'dh'}}, required: true}, esc defer ekm
+    arg =
+      user :
+        local :
+          uid : @_uid
+          username : @_username
+      host : "keybase.io"
+      sig_eng : signer.km.make_sig_eng()
+      seqno : 0
+      prev : null
+    arg.kms =
+      encryption : ekm.km
+      signing : skm.km
+    arg.generation = 1
+    proof = new proofs.PerUserKey arg
+    
+    await @_sign_and_commit_link { linkdesc, proof }, esc defer()
+    cb null
+  
   #-------------------
 
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->
