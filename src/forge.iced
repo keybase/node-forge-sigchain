@@ -50,10 +50,20 @@ generate_v1_with_corruption = ({links,proof,opts,hooks}, cb) ->
   out = null
   opts = version : constants.versions.sig_v1
   await proof._v_generate opts, esc defer()
-  await proof.generate_json opts, esc defer json, json_obj
+
+  corrupt_reverse_sig = null
+  if hooks?.corrupt_for_reverse_signature?
+    await proof.generate_json opts, esc defer _, json_obj
+    hooks.corrupt_for_reverse_signature {obj : json_obj}
+    corrupt_json = json_stringify_sorted json_obj
+    sigeng = proof.get_new_km().make_sig_eng()
+    await sigeng.box corrupt_json, esc defer {armored, type}
+    corrupt_reverse_sig = armored
   
-  if hooks?.corrupt?
-    hooks.corrupt {proof : proof, obj : json_obj}
+  await proof.generate_json opts, esc defer json, json_obj
+
+  if hooks?.corrupt_for_reverse_signature?
+    json_obj.body[hooks.corrupt_key_section].reverse_sig = corrupt_reverse_sig
     json = json_stringify_sorted json_obj
 
   inner = { str : json, obj : json_obj }
