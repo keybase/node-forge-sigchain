@@ -476,8 +476,8 @@ exports.Forge = class Forge
   _forge_per_user_key : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_per_user_key"
     signer = @_keyring.label[(ref = linkdesc.signer)]
-    await @_gen_key { obj: {key: {gen: 'eddsa'}}, required: true}, esc defer skm
-    await @_gen_key { obj: {key: {gen: 'dh'}}, required: true}, esc defer ekm
+    await @_gen_key { obj: {label: linkdesc.label + '_enc', key: {gen: 'dh'}}, required: true}, esc defer ekm
+    await @_gen_key { obj: {label: linkdesc.label + '_sig', key: {gen: 'eddsa'}}, required: true}, esc defer skm
     arg =
       user :
         local :
