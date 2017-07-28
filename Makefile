@@ -17,7 +17,9 @@ lib/%.js: src/%.iced
 
 $(BUILD_STAMP): \
 	lib/main.js \
-	lib/forge.js
+	lib/forge.js \
+	lib/teamforge.js \
+	lib/teamlib.js
 	date > $@
 
 clean:
