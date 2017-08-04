@@ -45,7 +45,7 @@ exports.TeamForge = class TeamForge
     @default_user_label = "herb"
 
     for user_label, user_desc of @chain.users
-      await user = new User {forge:@, label: user_label}, esc defer()
+      await User.make {forge:@, label: user_label}, esc defer user
       @users[user_label] = user
       await user.apply @out, esc defer()
 
@@ -54,7 +54,7 @@ exports.TeamForge = class TeamForge
         id: @out.users[user_label].link_map[1] # link_id
 
     for label, team_desc of @chain.teams
-      await team = new Team {forge:@, label}, esc defer()
+      await Team.make {forge:@, label}, esc defer team
       @teams[label] = team
 
       for link_desc in team_desc.links
@@ -84,9 +84,9 @@ exports.TeamForge = class TeamForge
   _gen_key : (typ, cb) ->
     switch typ
       when 'eddsa'
-        await kbpgp.kb.KeyManager.generate {}, cb
+        kbpgp.kb.KeyManager.generate {}, cb
       when 'dh'
-        await kbpgp.kb.EncKeyManager.generate {}, cb
+        kbpgp.kb.EncKeyManager.generate {}, cb
       else
         await athrow (new Error "unknown key type: #{typ}"), defer()
 
@@ -104,8 +104,12 @@ class LinkIDGen
 #===================================================
 
 class User
-  constructor : ({@forge, @label, @username, @eldest_seqno}, cb) ->
-    esc = make_esc cb, "TeamForge::User::constructor"
+  @make : (args, cb) ->
+    obj = new User
+    obj._init args, (err) -> cb err, obj
+
+  _init : ({@forge, @label, @username, @eldest_seqno}, cb) ->
+    esc = make_esc cb, "TeamForge::User::_init"
 
     @username or= @label
     @eldest_seqno or= 1
@@ -194,8 +198,12 @@ class User
 #===================================================
 
 class Team
-  constructor: ({@forge, @label, @name}, cb) ->
-    esc = make_esc cb, "Team::constructor"
+  @make : (args, cb) ->
+    obj = new Team
+    obj._init args, (err) -> cb err, obj
+
+  _init: ({@forge, @label, @name}, cb) ->
+    esc = make_esc cb, "Team::_init"
     @name or= @label
     @id = @_hash_team_id @name
     await PerTeamSecretKeys.make esc defer ptk_secrets 
@@ -210,6 +218,7 @@ class Team
     esc = make_esc cb, "Team::apply"
 
     out.teams[@label] =
+      id: @id
       links: (link.for_client for link in @links)
       team_key_box: @team_key_box
       tmp_tk_sec: @ptsks_list[0].seed.toString 'hex'
