@@ -6,11 +6,13 @@ fs = require 'fs'
 JSON5 = require 'json5'
 {drain} = require 'iced-utils'
 {Forge} = require './forge'
+{TeamForge} = require './teamforge'
 ics = require 'iced-coffee-script'
 path = require 'path'
 
 #===================================================
 
+# Reads and parses a data file.
 exports.Chain = class Chain
 
   #------------------------
@@ -29,6 +31,7 @@ exports.Chain = class Chain
 
   #------------------------
 
+  # Get the data from the file.
   get_data : () -> @_dat
 
   #------------------------
@@ -93,17 +96,22 @@ exports.Runner = class Runner
     @_files = []
 
   parse_argv : ({argv}, cb) ->
-    parsed = minimist argv, { boolean : [ "c", "check", "p", "pretty" ]}
+    parsed = minimist argv, { boolean : [ "c", "check", "p", "pretty", "h", "help" ]}
     @_files = parsed._
     @format = parsed.f or parsed.format
+    @team = parsed.t or parsed.team
     @check_only = parsed.c or parsed.check
     @dir = parsed.d or parsed.dir
     @pretty = parsed.p or parsed.pretty
+    @help = parsed.h or parsed.help
     cb null
 
   run : ({argv}, cb) ->
     esc = make_esc cb, "run"
     await @parse_argv {argv}, esc defer()
+
+    if @help
+      return @show_help()
 
     if @_files.length
       @_chains = (new Chain { file : f, @format, @dir } for f in @_files)
@@ -112,12 +120,27 @@ exports.Runner = class Runner
 
     for c in @_chains
       await c.load {}, esc defer()
-      f = new Forge { chain : c.get_data().chain }
+      if @team
+        f = new TeamForge { chain : c.get_data() }
+      else
+        f = new Forge { chain : c.get_data().chain }
       await f.forge esc defer out
       out = JSON.stringify(out, null, (if @pretty then 4 else null))
       await c.output out, esc defer() unless @check_only
 
     cb null
+
+  show_help : () ->
+    console.log """
+    Usage:
+      forge-sigchain [-f <format>] [-t] [-c] [-p] <files>
+
+      If <files> are not provided, stdin will be used.
+      -f, --format   format (json, cson, iced, etc)
+      -t, --team     generate a team chain
+      -c, --check    check only
+      -p, --pretty   pretty print output
+    """
 
 #===================================================
 
