@@ -4,6 +4,7 @@ kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
 constants = proofs.constants
 {prng,createHash} = require 'crypto'
+{make_prng} = require './badprng'
 {PerUserSecretKeys, PerTeamSecretKeys, PerTeamKeyBoxes, PerTeamSecretKeySet, PerTeamKeyBox} = require './teamlib'
 
 #===================================================
@@ -25,6 +26,9 @@ exports.TeamForge = class TeamForge
   forge : (cb) ->
     esc = make_esc cb, "TeamForge::forge"
 
+    # initialize a deterministic prng
+    # so that the generated json is more likely to be deterministic
+    @prng = make_prng()
     # temporary state for the forge
     @teams = {}
     @users = {}
@@ -84,9 +88,9 @@ exports.TeamForge = class TeamForge
   _gen_key : (typ, cb) ->
     switch typ
       when 'eddsa'
-        kbpgp.kb.KeyManager.generate {}, cb
+        kbpgp.kb.KeyManager.generate {seed: @prng 32}, cb
       when 'dh'
-        kbpgp.kb.EncKeyManager.generate {}, cb
+        kbpgp.kb.EncKeyManager.generate {seed: @prng 32}, cb
       else
         await athrow (new Error "unknown key type: #{typ}"), defer()
 
@@ -151,7 +155,7 @@ class User
           kid: km_sig.get_ekid().toString "hex"
 
     @puk_secrets =
-      1: prng(32).toString('hex')
+      1: @forge.prng(32).toString('hex')
       # 1: "5b7923a534415f19ac4f5c97f32605f1b542bcf5f134b57241dee2b790c09648"
 
     cb null
@@ -183,7 +187,7 @@ class User
 
   get_puk_kms : (cb) ->
     esc = make_esc cb, "User::get_puk_kms"
-    s = new PerUserSecretKeys {seed: (new Buffer @puk_secrets[1], 'hex') }
+    s = new PerUserSecretKeys { seed: (new Buffer @puk_secrets[1], 'hex'), prng: @forge.prng }
     await s.derive {}, esc defer()
     cb null, s.kms
 
@@ -220,7 +224,7 @@ class Team
     esc = make_esc cb, "Team::_init"
     @name or= @label
     @id = @_hash_team_id @name
-    await PerTeamSecretKeys.make esc defer ptk_secrets 
+    await PerTeamSecretKeys.make { prng: @forge.prng }, esc defer ptk_secrets 
     @ptsks_list = [ptk_secrets]
     @links = []
     cb null
@@ -307,7 +311,7 @@ class Team
     d = {}
     d[user.uid] = new PerTeamKeyBox { uid: user.uid, version : 1, per_user_key_seqno : 1, km: receiver_puk_kms.encryption }
     boxes = new PerTeamKeyBoxes d
-    sks = new PerTeamSecretKeySet { generation : 1, boxes, encrypting_km: sender_puk_kms.encryption }
+    sks = new PerTeamSecretKeySet { generation : 1, boxes, encrypting_km: sender_puk_kms.encryption, prng: @forge.prng }
     await sks.encrypt { ptsk_new : ptsk }, esc defer sks_post
 
     @team_key_box =
