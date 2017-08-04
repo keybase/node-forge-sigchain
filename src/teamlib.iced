@@ -1,7 +1,7 @@
 # Fragments copied from server.
 
 {make_esc} = require 'iced-error'
-{prng,createHash,createHmac} = require 'crypto'
+{createHash,createHmac} = require 'crypto'
 kbpgp = require 'kbpgp'
 kb = kbpgp.kb
 {KeyManager,EncKeyManager} = kbpgp.kb
@@ -27,8 +27,8 @@ exports.derive_key = derive_key = ({key, who, which, omit_prefix, alg, enc}) ->
 
 class PerXSecretKeys
 
-  constructor : ({@seed, @kms, @who, @secret_box_key}) ->
-    @seed or= prng(32)
+  constructor : ({@seed, @kms, @who, @secret_box_key, @prng}) ->
+    @seed or= @prng(32)
     @kms or= {}
     @secret_box_key or= null
 
@@ -61,8 +61,8 @@ exports.PerTeamSecretKeys = class PerTeamSecretKeys extends PerXSecretKeys
     args.who = "Team"
     super args
 
-  @make : (cb) ->
-    s = new PerTeamSecretKeys {}
+  @make : ({prng}, cb) ->
+    s = new PerTeamSecretKeys {prng}
     await s.derive {}, defer err
     cb err, s
 
@@ -74,7 +74,7 @@ exports.PerTeamSecretKeys = class PerTeamSecretKeys extends PerXSecretKeys
 #  in test (via encrypt).
 exports.PerTeamSecretKeySet = class PerTeamSecretKeySet
 
-  constructor : ({@encrypting_km, @generation, @boxes, @prev, @encrypting_kid, @nonce}) ->
+  constructor : ({@encrypting_km, @generation, @boxes, @prev, @encrypting_kid, @nonce, @prng}) ->
 
   #-----
 
@@ -90,44 +90,6 @@ exports.PerTeamSecretKeySet = class PerTeamSecretKeySet
     encryption_kid = ptsk_new.get_kms().encryption.get_ekid().toString('hex')
     signing_kid = ptsk_new.get_kms().signing.get_ekid().toString('hex')
     new PerTeamPublicKeySet { @generation, encryption_kid, signing_kid }
-
-  #-----
-
-  @_parse_throw : ({encrypting_km,encrypting_kid,obj}) ->
-    generation = boxes = prev = nonce = null
-    if obj.generation?
-      generation = parseInt obj.generation
-      if isNaN(generation) or generation <= 0
-        throw MBPTKE("need a generation > 0; got #{obj.generation}")
-    if obj.boxes?
-      d = {}
-      for uid, box of obj.boxes
-        if d[uid]?
-          throw MBPTKE("box for #{uid} specified more than once")
-        d[uid] = PerTeamKeyBox.parse_throw {uid, box}
-      boxes = new PerTeamKeyBoxes d
-    if obj.prev?
-      unless generation?
-        throw MBPTKE("need a generation if given a prev")
-      prev = Buffer.from(obj.prev, 'base64')
-      if prev.length < 32
-        throw MBPTKE("bad encoding of prev key")
-      prev_parts = unpack prev
-      if typeof(prev_parts) isnt 'object' or not(Array.isArray(prev_parts)) or prev_parts.length isnt 3
-        throw MBPTKE("bad prev -- expected a packed array with 3 elements")
-      if prev_parts[0] isnt 1
-        throw MBPTKE("bad prev -- can only handle version 1")
-      if not(Buffer.isBuffer(prev_parts[1])) or prev_parts[1].length isnt 24
-        throw MBPTKE("bad prev -- need a 24 byte nonce")
-      if not(Buffer.isBuffer(prev_parts[2])) or prev_parts[2].length isnt 48
-        throw MBPTKE("bad prev -- need a 48 byte ciphertext")
-    if obj.nonce?
-      nonce = Nonce20.parse_throw obj.nonce
-    encrypting_kid = encrypting_km.get_ekid().toString('hex') if encrypting_km? and not encrypting_kid?
-    encrypting_kid or= obj.encrypting_kid
-    if (encrypting_kid? or boxes? or nonce?) and not (encrypting_kid? and boxes? and generation? and nonce?)
-      throw MBPTKE("need 'encrypting_kid', 'generation', 'nonce', and 'boxes' if any boxes")
-    new PerTeamSecretKeySet { encrypting_km, encrypting_kid, nonce, generation, boxes, prev }
 
   #-----
 
@@ -150,21 +112,6 @@ exports.PerTeamSecretKeySet = class PerTeamSecretKeySet
 
   #-----
 
-  @parse: ({obj}, cb) ->
-    esc = make_esc cb, "PerTeamSecretKeySet.parse"
-    E = null
-    await kbpgp.kb.EncKeyManager.import_public { hex }, esc defer encrypting_km if (hex = obj.encrypting_kid)?
-    await akatch ( () => PerTeamSecretKeySet._parse_throw {encrypting_km, obj} ), esc defer ret
-    cb null, ret
-
-  #-----
-
-  @s_parse : (obj) ->
-    if (k = obj.encrypting_kid)? and (err = check_kid(k))? then return [err, null]
-    katch ( () => PerTeamSecretKeySet._parse_throw { encrypting_kid : k, obj } )
-
-  #-----
-
   get_boxes : () -> if @boxes? then @boxes.boxes() else []
 
   #-----
@@ -177,7 +124,7 @@ exports.PerTeamSecretKeySet = class PerTeamSecretKeySet
   # @param {PerTeamSecretKeys} ptsk_prev The previous per team key set
   encrypt : ({ptsk_new, ptsk_prev}, cb) ->
     esc = make_esc cb, "PerTeamSecretKeySet.encrypt"
-    @nonce = nonce = new Nonce20 {}
+    @nonce = nonce = new Nonce20 {@prng}
     enc = 'base64'
     out =
       generation : @generation
@@ -261,8 +208,8 @@ exports.PerTeamKeyBoxes = class PerTeamKeyBoxes
 
 exports.Nonce20 = class Nonce20
 
-  constructor : ({@top,@i}) ->
-    @top or= prng(20)
+  constructor : ({@top,@i,@prng}) ->
+    @top or= @prng(20)
     @i or= 0
 
   next : () -> new Nonce20 { @top, i : @i + 1}
@@ -278,10 +225,5 @@ exports.Nonce20 = class Nonce20
   get_bottom : () -> @i
 
   top_eq : (n2) -> bufeq_secure @top, n2.top
-
-  @parse_throw : (s) ->
-    top = new Buffer s, 'base64'
-    throw MBPTKE("nonces should be 20 bytes long; got #{l}") unless (l = top.length) is 20
-    new Nonce20 { top }
 
 ##=======================================================================

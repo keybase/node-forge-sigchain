@@ -19,7 +19,8 @@ $(BUILD_STAMP): \
 	lib/main.js \
 	lib/forge.js \
 	lib/teamforge.js \
-	lib/teamlib.js
+	lib/teamlib.js \
+	lib/badprng.js
 	date > $@
 
 clean:
