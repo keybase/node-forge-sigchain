@@ -105,10 +105,17 @@ class LinkIDGen
 
 class User
   @make : (args, cb) ->
-    obj = new User
-    obj._init args, (err) -> cb err, obj
+    obj = new User args
+    obj._init (err) -> cb err, obj
 
-  _init : ({@forge, @label, @username, @eldest_seqno}, cb) ->
+  #-------------------
+
+  constructor : ({@forge, @label, @username, @eldest_seqno}) ->
+    # pass
+
+  #-------------------
+
+  _init : (cb) ->
     esc = make_esc cb, "TeamForge::User::_init"
 
     @username or= @label
@@ -199,10 +206,17 @@ class User
 
 class Team
   @make : (args, cb) ->
-    obj = new Team
-    obj._init args, (err) -> cb err, obj
+    obj = new Team args
+    obj._init (err) -> cb err, obj
 
-  _init: ({@forge, @label, @name}, cb) ->
+  #-------------------
+
+  constructor: ({@forge, @label, @name}) ->
+    # pass
+
+  #-------------------
+
+  _init: (cb) ->
     esc = make_esc cb, "Team::_init"
     @name or= @label
     @id = @_hash_team_id @name
