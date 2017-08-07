@@ -265,7 +265,7 @@ class Team
   _forge_link_root : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_root"
     km_sig = user.keys.default.signing
-    seqno = 1
+    seqno = link_desc.seqno or (@links.length + 1)
     ptsk = @ptsks_list[0]
     hash_meta = @forge._hash_meta 1000
     sig_arg =
@@ -338,7 +338,7 @@ class Team
   _forge_link_change_membership : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_change_membership"
     km_sig = user.keys.default.signing
-    seqno = @links.length + 1
+    seqno = link_desc.seqno or (@links.length + 1)
     hash_meta = @forge._hash_meta 1000
     prev = @links[@links.length-1].link_id
     if link_desc.corruptors?.prev?
@@ -389,7 +389,7 @@ class Team
   _forge_link_invite : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_invite"
     km_sig = user.keys.default.signing
-    seqno = @links.length + 1
+    seqno = link_desc.seqno or (@links.length + 1)
     hash_meta = @forge._hash_meta 1000
     prev = @links[@links.length-1].link_id
     if link_desc.corruptors?.prev?
@@ -440,7 +440,7 @@ class Team
   _forge_link_leave : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_leave"
     km_sig = user.keys.default.signing
-    seqno = @links.length + 1
+    seqno = link_desc.seqno or (@links.length + 1)
     hash_meta = @forge._hash_meta 1000
     prev = @links[@links.length-1].link_id
     if link_desc.corruptors?.prev?
