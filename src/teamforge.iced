@@ -42,6 +42,7 @@ exports.TeamForge = class TeamForge
       team_merkle: {} # map from team id to {seqno, linkid}
       merkle_triples: {} # map from keys with a dash "LeafID-HashMeta" to MerkleTriple's
       expect: @chain.expect
+      load: @chain.load
     @_link_id_gen = new LinkIDGen
 
     # This is the user who is loading teams.
@@ -255,6 +256,8 @@ class Team
     switch link_desc.type
       when 'root'              then @_forge_link_root              {link_desc, user}, cb
       when 'change_membership' then @_forge_link_change_membership {link_desc, user}, cb
+      when 'invite'            then @_forge_link_invite            {link_desc, user}, cb
+      when 'leave'             then @_forge_link_leave             {link_desc, user}, cb
       else cb (new Error "unhandled link type: #{link_desc.type}"), null
 
   #-------------------
@@ -262,7 +265,7 @@ class Team
   _forge_link_root : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_root"
     km_sig = user.keys.default.signing
-    seqno = 1
+    seqno = link_desc.seqno or (@links.length + 1)
     ptsk = @ptsks_list[0]
     hash_meta = @forge._hash_meta 1000
     sig_arg =
@@ -285,8 +288,15 @@ class Team
         generation: 1
         signing : ptsk.kms.signing
         encryption : ptsk.kms.encryption
+    if link_desc.corruptors?.sig_arg?
+      sig_arg = link_desc.corruptors?.sig_arg sig_arg
 
     proof = new proofs.team.Root sig_arg
+    if link_desc.corruptors?.per_team_key?
+      b4 = proof.set_new_key_section.bind(proof)
+      proof.set_new_key_section = (section) ->
+        b4 section
+        @per_team_key = link_desc.corruptors?.per_team_key section
     await proof.generate_v2 esc defer proof_gen_out
     link_id = SHA256 proof_gen_out.outer, 'hex'
 
@@ -328,8 +338,11 @@ class Team
   _forge_link_change_membership : ({link_desc, user}, cb) ->
     esc = make_esc cb, "_forge_link_change_membership"
     km_sig = user.keys.default.signing
-    seqno = @links.length + 1
+    seqno = link_desc.seqno or (@links.length + 1)
     hash_meta = @forge._hash_meta 1000
+    prev = @links[@links.length-1].link_id
+    if link_desc.corruptors?.prev?
+      prev = link_desc.corruptors?.prev prev
     sig_arg =
       seqno: seqno
       user:
@@ -344,10 +357,118 @@ class Team
         hash: "ff".repeat 64
         hash_meta: hash_meta
         seqno: 8001
-      prev: @links[@links.length-1].link_id
+      prev: prev
       sig_eng: km_sig.make_sig_eng()
+    if link_desc.corruptors?.sig_arg?
+      sig_arg = link_desc.corruptors?.sig_arg sig_arg
 
     proof = new proofs.team.ChangeMembership sig_arg
+    if link_desc.corruptors?.per_team_key?
+      b4 = proof.set_new_key_section.bind(proof)
+      proof.set_new_key_section = (section) ->
+        b4 section
+        @per_team_key = link_desc.corruptors?.per_team_key section
+    await proof.generate_v2 esc defer proof_gen_out
+    link_id = SHA256 proof_gen_out.outer, 'hex'
+
+    @links.push
+      proof: proof
+      proof_gen_out: proof_gen_out
+      link_id: link_id
+      for_client:
+        seqno: seqno
+        sig: proof_gen_out.armored
+        payload_json: proof_gen_out.inner.str
+        uid: proof_gen_out.inner.obj.body.key.uid
+        version: 2
+
+    cb null
+
+  #-------------------
+
+  _forge_link_invite : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_invite"
+    km_sig = user.keys.default.signing
+    seqno = link_desc.seqno or (@links.length + 1)
+    hash_meta = @forge._hash_meta 1000
+    prev = @links[@links.length-1].link_id
+    if link_desc.corruptors?.prev?
+      prev = link_desc.corruptors?.prev prev
+    sig_arg =
+      seqno: seqno
+      user:
+        local :
+          username : user.username
+          uid : user.uid
+      team:
+        id : @id
+        invites: link_desc.invites
+      merkle_root:
+        ctime: 1500570000 + 1
+        hash: "ff".repeat 64
+        hash_meta: hash_meta
+        seqno: 8001
+      prev: prev
+      sig_eng: km_sig.make_sig_eng()
+    if link_desc.corruptors?.sig_arg?
+      sig_arg = link_desc.corruptors?.sig_arg sig_arg
+
+    proof = new proofs.team.Invite sig_arg
+    if link_desc.corruptors?.per_team_key?
+      b4 = proof.set_new_key_section.bind(proof)
+      proof.set_new_key_section = (section) ->
+        b4 section
+        @per_team_key = link_desc.corruptors?.per_team_key section
+    await proof.generate_v2 esc defer proof_gen_out
+    link_id = SHA256 proof_gen_out.outer, 'hex'
+
+    @links.push
+      proof: proof
+      proof_gen_out: proof_gen_out
+      link_id: link_id
+      for_client:
+        seqno: seqno
+        sig: proof_gen_out.armored
+        payload_json: proof_gen_out.inner.str
+        uid: proof_gen_out.inner.obj.body.key.uid
+        version: 2
+
+    cb null
+
+  #-------------------
+
+  _forge_link_leave : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_leave"
+    km_sig = user.keys.default.signing
+    seqno = link_desc.seqno or (@links.length + 1)
+    hash_meta = @forge._hash_meta 1000
+    prev = @links[@links.length-1].link_id
+    if link_desc.corruptors?.prev?
+      prev = link_desc.corruptors?.prev prev
+    sig_arg =
+      seqno: seqno
+      user:
+        local :
+          username : user.username
+          uid : user.uid
+      team:
+        id : @id
+      merkle_root:
+        ctime: 1500570000 + 1
+        hash: "ff".repeat 64
+        hash_meta: hash_meta
+        seqno: 8001
+      prev: prev
+      sig_eng: km_sig.make_sig_eng()
+    if link_desc.corruptors?.sig_arg?
+      sig_arg = link_desc.corruptors?.sig_arg sig_arg
+
+    proof = new proofs.team.Leave sig_arg
+    if link_desc.corruptors?.per_team_key?
+      b4 = proof.set_new_key_section.bind(proof)
+      proof.set_new_key_section = (section) ->
+        b4 section
+        @per_team_key = link_desc.corruptors?.per_team_key section
     await proof.generate_v2 esc defer proof_gen_out
     link_id = SHA256 proof_gen_out.outer, 'hex'
 
