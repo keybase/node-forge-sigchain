@@ -39,10 +39,11 @@ exports.TeamForge = class TeamForge
       users: {}
       key_owners: {} # map from keyid to user_label
       key_pubkeyv2nacls: {} # map from keyid to keybase1.PublicKeyV2NaCl's
-      team_merkle: {} # map from team id to {seqno, linkid}
+      # map from team id to {seqno, linkid}
+      # also map from "<teamid>-seqno:<seqno>"
+      team_merkle: {}
       merkle_triples: {} # map from keys with a dash "LeafID-HashMeta" to MerkleTriple's
-      expect: @chain.expect
-      load: @chain.load
+      sessions: @chain.sessions
     @_link_id_gen = new LinkIDGen
 
     # This is the user who is loading teams.
@@ -245,6 +246,9 @@ class Team
 
     for link in @links
       out.team_merkle[@id] =
+        seqno: link.for_client.seqno
+        link_id: link.link_id
+      out.team_merkle["#{@id}-seqno:#{link.for_client.seqno}"] =
         seqno: link.for_client.seqno
         link_id: link.link_id
 
