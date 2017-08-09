@@ -41,6 +41,9 @@ exports.TeamForge = class TeamForge
       key_pubkeyv2nacls: {} # map from keyid to keybase1.PublicKeyV2NaCl's
       # map from team id to {seqno, linkid}
       # also map from "<teamid>-seqno:<seqno>"
+      # This is part of the fake merkle tree that is represented in the test outputs.
+      # It is consumed by the Go test driver mock in the client-side tests
+      # and used to return team merkle leafs to the client code being tested.
       team_merkle: {}
       merkle_triples: {} # map from keys with a dash "LeafID-HashMeta" to MerkleTriple's
       sessions: @chain.sessions
