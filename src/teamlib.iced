@@ -6,6 +6,7 @@ kbpgp = require 'kbpgp'
 kb = kbpgp.kb
 {KeyManager,EncKeyManager} = kbpgp.kb
 {pack,unpack} = require 'purepack'
+nacl = require 'keybase-nacl'
 
 #=============================================================
 
