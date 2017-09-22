@@ -432,33 +432,46 @@ class Team
 
     seqno = link_desc.seqno or @_next_seqno()
 
-    unless but_dont_save
-      ctext = sks.boxes.d[user.uid].box
-
-      if link_desc.corrupt_box
-        ctext[5] = 'f'
-        ctext[6] = 'f'
-        ctext[7] = 'f'
-
-      entry =
-        seqno: seqno
-        box:
-          nonce: sks.nonce.at(1).buffer().toString 'base64'
-          sender_kid: sender_puk_kms.encryption.get_ekid().toString 'hex'
-          generation: sks_post.generation
-          ctext: ctext.toString 'base64'
-          per_user_key_seqno: 1
-        prev: sks_post.prev or null
-
-      if link_desc.corrupt_prev
-        entry.prev = 'ffff' + entry.prev.slice(4)
-
-      @team_key_boxes.push entry
-
     sig_arg_kms =
       generation: generation
       signing : ptsk.kms.signing
       encryption : ptsk.kms.encryption
+
+    # early out
+    if but_dont_save
+      return cb null, {generation, sig_arg_kms}
+
+    # save the key, box, and prevs
+
+    ctext = sks.boxes.d[user.uid].box
+
+    if link_desc.corrupt_box
+      ctext[5] = 'f'
+      ctext[6] = 'f'
+      # guarantee a change
+      if ctext[7] is 'f'
+        ctext[7] = 'e'
+      else
+        ctext[7] = 'f'
+
+    entry =
+      seqno: seqno
+      box:
+        nonce: sks.nonce.at(1).buffer().toString 'base64'
+        sender_kid: sender_puk_kms.encryption.get_ekid().toString 'hex'
+        generation: sks_post.generation
+        ctext: ctext.toString 'base64'
+        per_user_key_seqno: 1
+      prev: sks_post.prev or null
+
+    if link_desc.corrupt_prev
+      # guarantee a change
+      if entry.prev.slice(0,4) is "ffff"
+        entry.prev = 'fffe' + entry.prev.slice(4)
+      else
+        entry.prev = 'ffff' + entry.prev.slice(4)
+
+    @team_key_boxes.push entry
 
     cb null, {generation, sig_arg_kms}
 
