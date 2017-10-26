@@ -275,12 +275,14 @@ class Team
 
   forge_link : ({link_desc, user}, cb) ->
     switch link_desc.type
-      when 'root'              then @_forge_link_root              {link_desc, user}, cb
-      when 'change_membership' then @_forge_link_change_membership {link_desc, user}, cb
-      when 'invite'            then @_forge_link_invite            {link_desc, user}, cb
-      when 'leave'             then @_forge_link_leave             {link_desc, user}, cb
-      when 'rotate_key'        then @_forge_link_rotate_key        {link_desc, user}, cb
-      when 'new_subteam'       then @_forge_link_new_subteam       {link_desc, user}, cb
+      when 'root'                      then @_forge_link_root                 {link_desc, user}, cb
+      when 'change_membership'         then @_forge_link_change_membership    {link_desc, user}, cb
+      when 'invite'                    then @_forge_link_invite               {link_desc, user}, cb
+      when 'leave'                     then @_forge_link_leave                {link_desc, user}, cb
+      when 'rotate_key'                then @_forge_link_rotate_key           {link_desc, user}, cb
+      when 'new_subteam'               then @_forge_link_new_subteam          {link_desc, user}, cb
+      when 'unsupported_critical'      then @_forge_link_unsupported_critical {link_desc, user}, cb
+      when 'unsupported_ignore'        then @_forge_link_unsupported_ignore   {link_desc, user}, cb
       else cb (new Error "unhandled link type: #{link_desc.type}"), null
 
   #-------------------
@@ -539,6 +541,28 @@ class Team
 
   #-------------------
 
+  # A link type not supported by the client and critical to loading the team
+  _forge_link_unsupported_critical : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_unsupported_critical"
+    sig_arg_team =
+      id : @id
+    proof_klass = UnsupportedLinkCritical
+    await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
+    cb null
+
+  #-------------------
+
+  # A link type not supported by the client but not critical to loading the team
+  _forge_link_unsupported_ignore : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_unsupported_critical"
+    sig_arg_team =
+      id : @id
+    proof_klass = UnsupportedLinkIgnoreIfUnsupported
+    await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
+    cb null
+
+  #-------------------
+
   # convert a role-set of user labels into a role-set of uvs.
   _process_members_section : (members_desc) ->
     ret = {}
@@ -573,6 +597,19 @@ class Team
     else
       1
 
+#===================================================
+
+# A proof generator class like ChangeMembership that creates links that
+# are not supported by the client. Think of this as a placeholder for future
+# link types that have not been invented yet.
+class UnsupportedLinkCritical extends proofs.team.TeamBase
+  _type : () -> "team.unsupported_critical"
+  _type_v2 : () -> 1337
+
+class UnsupportedLinkIgnoreIfUnsupported extends proofs.team.TeamBase
+  _type : () -> "team.unsupported_ignore"
+  _type_v2 : () -> 1338
+  _ignore_if_unsupported : () -> true
 
 #===================================================
 
