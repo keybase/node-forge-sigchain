@@ -281,6 +281,7 @@ class Team
       when 'leave'             then @_forge_link_leave             {link_desc, user}, cb
       when 'rotate_key'        then @_forge_link_rotate_key        {link_desc, user}, cb
       when 'new_subteam'       then @_forge_link_new_subteam       {link_desc, user}, cb
+      when 'unsupported'       then @_forge_link_unsupported       {link_desc, user}, cb
       else cb (new Error "unhandled link type: #{link_desc.type}"), null
 
   #-------------------
@@ -310,6 +311,9 @@ class Team
       sig_eng: km_sig.make_sig_eng()
     if prev isnt null
       sig_arg.prev = prev
+    if link_desc.ignore_if_unsupported?
+      @forge.push_log "ignore_if_unsupported:#{link_desc.ignore_if_unsupported} link_type:#{link_desc.type}"
+      sig_arg.ignore_if_unsupported = link_desc.ignore_if_unsupported
     if sig_arg_team?
       sig_arg.team = sig_arg_team
     if link_desc.admin?
@@ -539,6 +543,17 @@ class Team
 
   #-------------------
 
+  # A link type not supported by the client
+  _forge_link_unsupported : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_unsupported_critical"
+    sig_arg_team =
+      id : @id
+    proof_klass = UnsupportedLink
+    await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
+    cb null
+
+  #-------------------
+
   # convert a role-set of user labels into a role-set of uvs.
   _process_members_section : (members_desc) ->
     ret = {}
@@ -573,6 +588,14 @@ class Team
     else
       1
 
+#===================================================
+
+# A proof generator class like ChangeMembership that creates links that
+# are not supported by the client. Think of this as a placeholder for future
+# link types that have not been invented yet.
+class UnsupportedLink extends proofs.team.TeamBase
+  _type : () -> "team.unsupported_from_the_future"
+  _type_v2 : () -> 1337
 
 #===================================================
 
