@@ -33,7 +33,7 @@
     "json5": "^0.4.0",
     "kbpgp": "^2.0.9",
     "keybase-bitcoinjs-lib": "^1.0.2-1",
-    "keybase-proofs": "^2.1.7",
+    "keybase-proofs": "^2.1.25",
     "minimist": "^1.1.1",
     "tweetnacl": "^0.13.1"
   },
