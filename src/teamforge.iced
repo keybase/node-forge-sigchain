@@ -135,7 +135,7 @@ class User
       # generate an eldest key
       await @forge._gen_key 'eddsa', esc defer km_sig
       await @forge._gen_key 'dh', esc defer km_enc
-      pubkeyv2nacl = 
+      pubkeyv2nacl =
         deviceType: "desktop"
         deviceDescription: "home thing"
         deviceID: "fbd762facdfad44709aef63a9a8cdf18"
@@ -187,7 +187,7 @@ class User
     esc = make_esc cb, "User::apply"
 
     await @get_puk_kms esc defer puk_kms
-  
+
     out.users[@label] =
       uid: @uid
       eldest_seqno: @eldest_seqno
@@ -352,7 +352,7 @@ class Team
     await proof.generate_v2 esc defer proof_gen_out
     link_id = SHA256 proof_gen_out.outer, 'hex'
 
-    link_entry = 
+    link_entry =
       proof: proof
       proof_gen_out: proof_gen_out
       link_id: link_id
@@ -416,7 +416,7 @@ class Team
     if @ptsks_list.length > 0
       ptsk_prev = @ptsks_list[@ptsks_list.length-1]
 
-    await PerTeamSecretKeys.make { prng: @forge.prng }, esc defer ptsk 
+    await PerTeamSecretKeys.make { prng: @forge.prng }, esc defer ptsk
     generation = @ptsks_list.length + 1
     unless but_dont_save
       @ptsks_list.push ptsk
@@ -486,7 +486,9 @@ class Team
     proof_klass = proofs.team.ChangeMembership
     sig_arg_team =
       id : @id
-      members: @_process_members_section link_desc.members
+      members : @_process_members_section link_desc.members
+    if (invs = link_desc.completed_invites)?
+      sig_arg_team.completed_invites = @_user_label_map_to_uvs invs
     await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
     cb null
 
@@ -575,11 +577,21 @@ class Team
 
   #-------------------
 
+  _user_label_map_to_uvs : (user_labels) ->
+    ret = {}
+    for k, user_label of user_labels
+      user = @forge.users[user_label]
+      unless user? then throw new Error("couldn't find user #{user_label}")
+      ret[k] = user.uv_str()
+    ret
+
+  #-------------------
+
   _hash_team_id : (team_name) ->
     h = SHA256(team_name.toLowerCase())[0...15]
     id = h.toString('hex') + "24"
     return id
-  
+
   #-------------------
 
   _next_seqno : ->
