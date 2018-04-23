@@ -43,6 +43,8 @@
     "iced-coffee-script": "^1.8.0-d",
     "iced-test": "0.0.21",
     "icsify": "^0.7.0",
-    "istanbul": "^0.3.13"
+    "istanbul": "^0.3.13",
+    "pgp-utils": "0.0.34",
+    "purepack": "^1.0.4"
   }
 }
