@@ -42,7 +42,7 @@ generate_v2_with_corruption = ({links,proof, opts, hooks}, cb) ->
   cb null, out
 
 #===================================================
-    
+
 # Unlike v2 corrupt hooks, these hooks only accept the object, not the
 # json str for obj/str consistency.
 generate_v1_with_corruption = ({links,proof,opts,hooks}, cb) ->
@@ -59,7 +59,7 @@ generate_v1_with_corruption = ({links,proof,opts,hooks}, cb) ->
     sigeng = proof.get_new_km().make_sig_eng()
     await sigeng.box corrupt_json, esc defer {armored, type}
     corrupt_reverse_sig = armored
-  
+
   await proof.generate_json opts, esc defer json, json_obj
 
   if hooks?.corrupt_for_reverse_signature?
@@ -296,6 +296,7 @@ exports.Forge = class Forge
     proof.seq_type = proofs.constants.seq_types.PUBLIC
     proof.ctime = linkdesc.ctime # Was already converted to "real time" in _forge_link
     proof.expire_in = @_get_expire_in { obj : linkdesc }
+    proof.ignore_if_unsupported = linkdesc.ignore_if_unsupported
 
   #-------------------
 
@@ -470,7 +471,7 @@ exports.Forge = class Forge
       await athrow new Error('update failed : different ekid'), esc defer()
 
     cb null
-  
+
   #-------------------
 
   _forge_per_user_key : ({linkdesc}, cb) ->
@@ -492,10 +493,10 @@ exports.Forge = class Forge
       signing : skm.km
     arg.generation = 1
     proof = new proofs.PerUserKey arg
-    
+
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
-  
+
   #-------------------
 
   _sign_and_commit_link : ({linkdesc, proof}, cb) ->

@@ -40,5 +40,22 @@ chain :
       signer : "sib1"
       version : 2
       revoke : sig : "btc2"
+    },
+    {
+      label : "monero"
+      type : "btc"
+      ctime : "+100"
+      signer : "sib1"
+      version : 2
+      ignore_if_unsupported : true
+    },
+    {
+      label : "cardano"
+      type : "btc"
+      ctime : "+100"
+      signer : "sib1"
+      version : 2
+      ignore_if_unsupported : true
+      stubbed : true
     }
   ]
