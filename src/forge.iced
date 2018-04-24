@@ -33,8 +33,9 @@ generate_v2_with_corruption = ({links,proof, opts, hooks}, cb) ->
   inner = { str : s, obj : o }
   hooks.pre_generate_outer? { proof, inner }
   await proof.generate_outer { inner }, esc defer outer, outer_unpacked
-  new_outer = hooks.post_generate_outer? { links, proof, outer, inner }
-  outer = new_outer if new_outer?
+  res = {}
+  hooks.post_generate_outer? { links, proof, outer, inner, res }
+  outer = res.outer if res.outer?
   await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
   hooks.corrupt_box? { inner, outer, pgp, raw, armored }
   {short_id, id} = proofs.make_ids raw

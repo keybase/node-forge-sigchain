@@ -21,14 +21,15 @@ chain :
       signer : "e"
       version : 2
       ignore_if_unsupported : true
+      stubbed : true
       corrupt_v2_proof_hooks :
         pre_generate_outer : ({inner}) ->
           inner.obj.body.type = "monero"
           inner.str = json_stringify_sorted inner.obj
-        post_generate_outer : ({outer}) ->
+        post_generate_outer : ({outer, res}) ->
           tmp = unpack outer
           tmp[4] = 20
-          pack tmp
+          res.outer = pack tmp
     }
   ]
 
