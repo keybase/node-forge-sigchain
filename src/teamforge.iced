@@ -559,7 +559,7 @@ class Team
   # convert a role-set of user labels into a role-set of uvs.
   _process_members_section : (members_desc) ->
     ret = {}
-    valid = {"owner": true, "admin": true, "writer": true, "reader": true, "none": true}
+    valid = {"owner": true, "admin": true, "writer": true, "reader": true, "bot": true, "none": true}
     for k of members_desc
       assert valid[k], "invalid members key #{k}"
       ret[k] = @_user_label_list_to_uvs members_desc[k]

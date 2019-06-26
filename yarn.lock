@@ -82,14 +82,27 @@ base-x@^1.1.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/base-x/-/base-x-1.1.0.tgz#42d3d717474f9ea02207f6d1aa1f426913eeb7ac"
 
+base32.js@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/base32.js/-/base32.js-0.1.0.tgz#b582dec693c2f11e893cf064ee6ac5b6131a2202"
+  integrity sha1-tYLexpPC8R6JPPBk7mrFthMaIgI=
+
 base64-js@0.0.8:
   version "0.0.8"
   resolved "https://registry.yarnpkg.com/base64-js/-/base64-js-0.0.8.tgz#1101e9544f4a76b1bc3b26d452ca96d7a35e7978"
 
-bitcoyne@^1.0.2:
-  version "1.0.3"
-  resolved "https://registry.yarnpkg.com/bitcoyne/-/bitcoyne-1.0.3.tgz#7d4c36a39f3b0d6b6282e4f90f58d99eb00febbb"
+bech32@^1.1.3:
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/bech32/-/bech32-1.1.3.tgz#bd47a8986bbb3eec34a56a097a84b8d3e9a2dfcd"
+  integrity sha512-yuVFUvrNcoJi0sv5phmqc6P+Fl1HjRDRNOOkHY2X/3LBy2bIGNSFx4fZ95HMaXHupuS7cZR15AsvtmCIF4UEyg==
+
+bitcoyne@^1.0.5:
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/bitcoyne/-/bitcoyne-1.0.7.tgz#a8ec9b1acfdd3e7a979fecd663703461e30de91d"
+  integrity sha512-7n4Lr26AYzq6ghaXuu/Ei4LsnLn3peTB/iYryRuzWkyh4qQp4ns+jxTNP+F6xSjOlxhURtbUhpHMk1O5qnwRtQ==
   dependencies:
+    base32.js "^0.1.0"
+    bech32 "^1.1.3"
     iced-error "^0.0.9"
     iced-runtime "^1.0.2"
     kbpgp "^2.0.0"
@@ -332,6 +345,11 @@ combine-source-map@~0.6.1:
 "commander@>= 0.5.2":
   version "2.11.0"
   resolved "https://registry.yarnpkg.com/commander/-/commander-2.11.0.tgz#157152fd1e7a6c8d98a5b715cf376df928004563"
+
+commander@~2.20.0:
+  version "2.20.0"
+  resolved "https://registry.yarnpkg.com/commander/-/commander-2.20.0.tgz#d58bb2b5c1ee8f87b0d340027e9e94e222c5a422"
+  integrity sha512-7j2y+40w61zy6YC2iRNpUe/NwhNyoXrYpHMrSunaMG64nRnaf96zO/KMQR4OyN/UnE5KLyEBnKHd4aG3rskjpQ==
 
 commondir@0.0.1:
   version "0.0.1"
@@ -869,7 +887,26 @@ jsonparse@^1.2.0:
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/jsonparse/-/jsonparse-1.3.1.tgz#3f4dae4a91fac315f71062f8521cc239f1366280"
 
-kbpgp@>=2.0.58, kbpgp@^2.0.0, kbpgp@^2.0.9:
+kbpgp@>=2.1.2:
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.1.2.tgz#1a25ed116dc8622ea2aff6dd90981c551748c12d"
+  integrity sha512-zEW2z0ATF7wiAp0SUAZ3Ufl5MkKj219RM02zsCwIT4G8EZmD8NAbEp7p7ccOZzGvWyi5bO0oJrF94YuY8b5XhA==
+  dependencies:
+    bn "^1.0.0"
+    bzip-deflate "^1.0.0"
+    deep-equal ">=0.2.1"
+    iced-error ">=0.0.10"
+    iced-lock "^1.0.2"
+    iced-runtime "^1.0.3"
+    keybase-ecurve "^1.0.0"
+    keybase-nacl "^1.1.0"
+    minimist "^1.2.0"
+    pgp-utils ">=0.0.34"
+    purepack ">=1.0.4"
+    triplesec "^4.0.3"
+    tweetnacl "^0.13.1"
+
+kbpgp@^2.0.0, kbpgp@^2.0.9:
   version "2.0.73"
   resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.0.73.tgz#702dcaed11096554c4d56c9c41caecbb04f407c4"
   dependencies:
@@ -912,15 +949,25 @@ keybase-nacl@^1.0.0:
     tweetnacl "^0.13.1"
     uint64be "^1.0.1"
 
-keybase-proofs@^2.1.7:
-  version "2.1.16"
-  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.1.16.tgz#f453be0f5814073fa218be89dcd95c0bcb6b50d8"
+keybase-nacl@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/keybase-nacl/-/keybase-nacl-1.1.0.tgz#033318f62ef0f5907e7830605a3a2e989bb449ee"
+  integrity sha512-x5iGKQQZTdGTrn3GmCyXeC2+AJj2NppbrTZI/IUwcYML7FF8vA4akkg6iciGQN7dnVPS7+BJggc++YR6khelZg==
   dependencies:
-    bitcoyne "^1.0.2"
+    iced-runtime "^1.0.2"
+    tweetnacl "^0.13.1"
+    uint64be "^1.0.1"
+
+keybase-proofs@^2.1.33:
+  version "2.3.3"
+  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.3.3.tgz#171ce8c2c8274a92763e0898b87b1c4c7fe9cbff"
+  integrity sha512-ZexyM8r2RR4QNE6CaQlKXdU1PkFyq/f3yXhxmED8qM02Bq9B44EhgRlV9IFGLNK7XtAM1FZM0u7cwENE/FfZfw==
+  dependencies:
+    bitcoyne "^1.0.5"
     iced-error ">=0.0.9"
     iced-lock "^1.0.1"
     iced-runtime ">=0.0.1"
-    kbpgp ">=2.0.58"
+    kbpgp ">=2.1.2"
     pgp-utils ">=0.0.22"
     purepack "^1.0.4"
     triplesec ">=3.0.16"
@@ -1122,9 +1169,25 @@ pbkdf2@^3.0.3:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
+pgp-utils@0.0.34:
+  version "0.0.34"
+  resolved "https://registry.yarnpkg.com/pgp-utils/-/pgp-utils-0.0.34.tgz#d84f49f7c193b5e0b9415f5cc5c2a695ed790c23"
+  integrity sha1-2E9J98GTteC5QV9cxcKmle15DCM=
+  dependencies:
+    iced-error ">=0.0.8"
+    iced-runtime ">=0.0.1"
+
 pgp-utils@>=0.0.22, pgp-utils@>=0.0.32:
   version "0.0.32"
   resolved "https://registry.yarnpkg.com/pgp-utils/-/pgp-utils-0.0.32.tgz#03875115cde71a6a444ea8e0b408863dff7cbe1e"
+  dependencies:
+    iced-error ">=0.0.8"
+    iced-runtime ">=0.0.1"
+
+pgp-utils@>=0.0.34:
+  version "0.0.35"
+  resolved "https://registry.yarnpkg.com/pgp-utils/-/pgp-utils-0.0.35.tgz#3cb3ccf355bea08073d99c9d8ec27984a14f43f6"
+  integrity sha512-gCT6EbSTgljgycVa5qGpfRITaLOLbIKsEVRTdsNRgmLMAJpuJNNdrTn/95r8IWo9rFLlccfmGMJXkG9nVDwmrA==
   dependencies:
     iced-error ">=0.0.8"
     iced-runtime ">=0.0.1"
@@ -1316,6 +1379,11 @@ source-map@~0.5.1:
   version "0.5.6"
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.5.6.tgz#75ce38f52bf0733c5a7f0c118d81334a2bb5f412"
 
+source-map@~0.6.1:
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
+  integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
+
 sprintf-js@~1.0.2:
   version "1.0.3"
   resolved "https://registry.yarnpkg.com/sprintf-js/-/sprintf-js-1.0.3.tgz#04e6926f662895354f3dd015203633b857297e2c"
@@ -1401,6 +1469,18 @@ triplesec@>=3.0.16, triplesec@>=3.0.19, triplesec@^3.0.17:
     more-entropy ">=0.0.7"
     progress "~1.1.2"
 
+triplesec@^4.0.3:
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/triplesec/-/triplesec-4.0.3.tgz#fce5b89821b24d3a03bd09a15a4baecbd6a9b7a4"
+  integrity sha512-fug70e1nJoCMxsXQJlETisAALohm84vl++IiTTHEqM7Lgqwz62jrlwqOC/gJEAJjO/ByN127sEcioB56HW3wIw==
+  dependencies:
+    iced-error ">=0.0.9"
+    iced-lock "^1.0.1"
+    iced-runtime "^1.0.2"
+    more-entropy ">=0.0.7"
+    progress "~1.1.2"
+    uglify-js "^3.1.9"
+
 tty-browserify@~0.0.0:
   version "0.0.0"
   resolved "https://registry.yarnpkg.com/tty-browserify/-/tty-browserify-0.0.0.tgz#a157ba402da24e9bf957f9aa69d524eed42901a6"
@@ -1433,6 +1513,14 @@ uglify-js@^2.6:
     yargs "~3.10.0"
   optionalDependencies:
     uglify-to-browserify "~1.0.0"
+
+uglify-js@^3.1.9:
+  version "3.6.0"
+  resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-3.6.0.tgz#704681345c53a8b2079fb6cec294b05ead242ff5"
+  integrity sha512-W+jrUHJr3DXKhrsS7NUVxn3zqMOFn0hL/Ei6v0anCIMoKC93TjcflTagwIHLW7SfMFfiQuktQyFVCFHGUE0+yg==
+  dependencies:
+    commander "~2.20.0"
+    source-map "~0.6.1"
 
 uglify-to-browserify@~1.0.0:
   version "1.0.2"
