@@ -30,6 +30,7 @@
     "iced-logger": "0.0.6",
     "iced-runtime": "^1.0.2",
     "iced-utils": "^0.1.22",
+    "istanbul": "^0.4.5",
     "json5": "^0.4.0",
     "kbpgp": "^2.0.9",
     "keybase-bitcoinjs-lib": "^1.0.2-1",
@@ -38,12 +39,11 @@
     "tweetnacl": "^0.13.1"
   },
   "devDependencies": {
-    "browserify": "^9.0.8",
+    "browserify": "^16.2.3",
     "glob": "^7.1.1",
     "iced-coffee-script": "^1.8.0-d",
     "iced-test": "0.0.21",
     "icsify": "^0.7.0",
-    "istanbul": "^0.3.13",
     "pgp-utils": "0.0.34",
     "purepack": "^1.0.4"
   }
