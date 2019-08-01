@@ -738,13 +738,21 @@ https-browserify@^1.0.0:
   resolved "https://registry.yarnpkg.com/https-browserify/-/https-browserify-1.0.0.tgz#ec06c10e0a34c0f2faf199f7fd7fc78fffd03c73"
   integrity sha1-7AbBDgo0wPL68Zn3/X/Hj//QPHM=
 
-iced-coffee-script@^1.8.0-a, iced-coffee-script@^1.8.0-d:
+iced-coffee-script@^1.8.0-a:
   version "1.8.0-e"
   resolved "https://registry.yarnpkg.com/iced-coffee-script/-/iced-coffee-script-1.8.0-e.tgz#e9d3e17b870fca8179fd0f6254e2761afce5a136"
   dependencies:
     docco "~0.6.2"
     iced-runtime ">=0.0.1"
     mkdirp "~0.3.5"
+
+iced-coffee-script@^108.0.13:
+  version "108.0.13"
+  resolved "https://registry.yarnpkg.com/iced-coffee-script/-/iced-coffee-script-108.0.13.tgz#574085c8c0e2e3f21583db46df3d8d541e511e0a"
+  integrity sha512-0qG9vtelrtfY1NCh+120EINbytkt2rkCVXJ81EOItbP7B8vildMCfLfuQdYRSy7r2T6Z+2zok/NuPRuokqSNNA==
+  dependencies:
+    iced-runtime ">=0.0.1"
+    uglify-js "^3.5.9"
 
 iced-error@0.0.9, iced-error@^0.0.9:
   version "0.0.9"
@@ -929,7 +937,7 @@ kbpgp@>=2.1.2:
     triplesec "^4.0.3"
     tweetnacl "^0.13.1"
 
-kbpgp@^2.0.0, kbpgp@^2.0.9:
+kbpgp@^2.0.0:
   version "2.0.73"
   resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.0.73.tgz#702dcaed11096554c4d56c9c41caecbb04f407c4"
   dependencies:
@@ -945,6 +953,25 @@ kbpgp@^2.0.0, kbpgp@^2.0.9:
     pgp-utils ">=0.0.32"
     purepack ">=1.0.4"
     triplesec ">=3.0.19"
+    tweetnacl "^0.13.1"
+
+kbpgp@^2.1.3:
+  version "2.1.3"
+  resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.1.3.tgz#09a98e5ad83af9f3a5ebc4fafd750de25743ee20"
+  integrity sha512-Bnej67+byG2KUVMzCIQQszANru7+5OSpUOEGwacAmIEYrmC45KtpLQBT9RDgXjIbFc7jblKPiTBpz1wMhbZk4g==
+  dependencies:
+    bn "^1.0.0"
+    bzip-deflate "^1.0.0"
+    deep-equal ">=0.2.1"
+    iced-error ">=0.0.10"
+    iced-lock "^1.0.2"
+    iced-runtime "^1.0.3"
+    keybase-ecurve "^1.0.0"
+    keybase-nacl "^1.1.0"
+    minimist "^1.2.0"
+    pgp-utils ">=0.0.34"
+    purepack ">=1.0.4"
+    triplesec "^4.0.3"
     tweetnacl "^0.13.1"
 
 keybase-bitcoinjs-lib@^1.0.2-1:
@@ -981,10 +1008,10 @@ keybase-nacl@^1.1.0:
     tweetnacl "^0.13.1"
     uint64be "^1.0.1"
 
-keybase-proofs@^2.1.33:
-  version "2.3.3"
-  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.3.3.tgz#171ce8c2c8274a92763e0898b87b1c4c7fe9cbff"
-  integrity sha512-ZexyM8r2RR4QNE6CaQlKXdU1PkFyq/f3yXhxmED8qM02Bq9B44EhgRlV9IFGLNK7XtAM1FZM0u7cwENE/FfZfw==
+keybase-proofs@^2.3.7:
+  version "2.3.7"
+  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.3.7.tgz#ce7c25c0006eb4f229c3816690c7928561048db5"
+  integrity sha512-srD/KIOiQiNaT0MZLdJgZLVMOHMAcVicTsCqUbd0nnmoTApim1PsHH3C40VT6Me3axWorAvkwJ2t4AJaRLjDtA==
   dependencies:
     bitcoyne "^1.0.5"
     iced-error ">=0.0.9"
@@ -1537,7 +1564,7 @@ typedarray@^0.0.6:
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
-uglify-js@^3.1.4, uglify-js@^3.1.9:
+uglify-js@^3.1.4, uglify-js@^3.1.9, uglify-js@^3.5.9:
   version "3.6.0"
   resolved "https://registry.yarnpkg.com/uglify-js/-/uglify-js-3.6.0.tgz#704681345c53a8b2079fb6cec294b05ead242ff5"
   integrity sha512-W+jrUHJr3DXKhrsS7NUVxn3zqMOFn0hL/Ei6v0anCIMoKC93TjcflTagwIHLW7SfMFfiQuktQyFVCFHGUE0+yg==
