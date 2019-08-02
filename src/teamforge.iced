@@ -545,8 +545,9 @@ class Team
 
   # generate a new per-team key and store it on the team
   # unless but_dont_save in which case no state is saved
-  _new_team_key: ({link_desc, user, but_dont_save}, cb) ->
+  _new_team_key: ({link_desc, user, but_dont_save, chain_type}, cb) ->
     esc = make_esc cb, "_new_team_key"
+    chain_type or= proofs.constants.seq_types.SEMIPRIVATE
 
     ptsk_prev = null
     if @ptsks_list.length > 0
@@ -598,6 +599,7 @@ class Team
 
     entry =
       seqno: seqno
+      chain_type : chain_type
       box:
         nonce: sks.nonce.at(1).buffer().toString 'base64'
         sender_kid: sender_puk_kms.encryption.get_ekid().toString 'hex'
@@ -657,7 +659,8 @@ class Team
     esc = make_esc cb, "_forge_link_rotate_key_hidden"
     sig_arg_team = { @id }
     proof_klass = proofs.team_hidden.RotateKey
-    await @_new_team_key { link_desc, user }, esc defer {sig_arg_kms, generation}
+    chain_type = proofs.constants.seq_types.TEAM_HIDDEN
+    await @_new_team_key { link_desc, user, chain_type }, esc defer {sig_arg_kms, generation}
     sig_arg_kms.generation = generation
     await @_forge_link_helper_hidden {link_desc, user, proof_klass, sig_arg_team, sig_arg_kms}, esc defer()
     cb null
