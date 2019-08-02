@@ -6,6 +6,8 @@ constants = proofs.constants
 {prng,createHash,createHmac} = require 'crypto'
 {make_prng} = require './badprng'
 {PerUserSecretKeys, PerTeamSecretKeys, PerTeamKeyBoxes, PerTeamSecretKeySet, PerTeamKeyBox, RatchetBlindingKey, RatchetBlindingKeySet} = require './teamlib'
+{copy_obj} = require './util'
+{pack,unpack} = require 'purepack'
 
 #===================================================
 
@@ -76,6 +78,7 @@ exports.TeamForge = class TeamForge
       team_merkle: {}
       merkle_triples: {} # map from keys with a dash "LeafID-HashMeta" to MerkleTriple's
       sessions: @chain.sessions
+      skip : !!@chain.skip
     @_link_id_gen = new LinkIDGen
 
     # This is the user who is loading teams.
@@ -373,13 +376,37 @@ class Team
         chain_type : link_desc.admin.seq_type
       }
 
+    if (f = link_desc.corruptors?.sig_arg)?
+      sig_arg = f sig_arg
+
     proof = new proof_klass sig_arg
+
+    if link_desc.corruptors?.no_reverse_sig
+      proof._v_reverse_sign = ({inner, outer}, cb) -> cb null, { inner, outer }
+
+    if (f = link_desc.corruptors?.reverse_sig_inputs)?
+      existing_hook = proof._v_reverse_sign.bind(proof)
+      proof._v_reverse_sign = ({inner, outer}, cb) ->
+        inner = copy_obj inner
+        f { inner, outer }
+        await existing_hook { inner, outer }, defer err, res
+        cb err, res
+
     await proof.generate {}, esc defer proof_gen_out
     link_id = SHA256 proof_gen_out.json.outer , 'hex'
+    outer = proof_gen_out.armored.outer
+    inner = proof_gen_out.armored.inner
+
+    # We might want to corrupt the object in outer bundle
+    if (f = link_desc.corruptors?.sig3_corrupt_outer)?
+      raw = f(unpack(Buffer.from(outer, 'base64')))
+      outer = pack(raw).toString('base64')
+
     bundle =
-      i : proof_gen_out.armored.inner
-      o : proof_gen_out.armored.outer
+      i : inner
+      o : outer
       s : proof_gen_out.armored.sig
+    link_desc.corruptors?.sig3_bundle? { bundle }
     link_entry =
       proof : proof
       proof_gen_out : proof_gen_out
@@ -398,10 +425,10 @@ class Team
 
   #-------------------
 
-  _make_ratchet : (hidden) ->
+  _make_ratchet : ({hidden, link_desc}) ->
     arg = {
-      link_id : hidden.link_id
-      seqno : hidden.for_client.seqno
+      link_id : maybe_unhex hidden.link_id
+      seqno : link_desc.corruptors?.ratchet_seqno or hidden.for_client.seqno
       chain_type : proofs.constants.seq_types.TEAM_HIDDEN
       prng : (i) => @forge.prng(i)
     }
@@ -424,7 +451,9 @@ class Team
       prev = link_desc.corruptors?.prev prev
     ratchet = null
     if (hidden_prev = @hidden_links[-1...]?[0])?
-      ratchet = @_make_ratchet hidden_prev
+      if (f = link_desc.corruptors?.hidden_prev)?
+        hidden_prev = f hidden_prev
+      ratchet = @_make_ratchet {hidden : hidden_prev, link_desc}
     ctime = 1500570000 + 1
     sig_arg =
       seqno: seqno
@@ -453,7 +482,7 @@ class Team
     if link_desc.corruptors?.sig_arg?
       sig_arg = link_desc.corruptors?.sig_arg sig_arg
     if ratchet?
-      sig_arg.team.rachets = [ ratchet.id() ]
+      sig_arg.team.ratchets = [ ratchet.id() ]
 
     proof = new proof_klass sig_arg
     if link_desc.corruptors?.per_team_key?
@@ -545,7 +574,7 @@ class Team
 
   # generate a new per-team key and store it on the team
   # unless but_dont_save in which case no state is saved
-  _new_team_key: ({link_desc, user, but_dont_save, chain_type}, cb) ->
+  _new_team_key: ({link_desc, user, but_dont_save, chain_type, seqno}, cb) ->
     esc = make_esc cb, "_new_team_key"
     chain_type or= proofs.constants.seq_types.SEMIPRIVATE
 
@@ -572,7 +601,7 @@ class Team
     sks = new PerTeamSecretKeySet { generation : generation, boxes, encrypting_km: sender_puk_kms.encryption, prng: @forge.prng }
     await sks.encrypt { ptsk_new : ptsk, ptsk_prev }, esc defer sks_post
 
-    seqno = link_desc.seqno or @_next_seqno()
+    seqno = seqno or link_desc.seqno or @_next_seqno()
 
     sig_arg_kms =
       generation: generation
@@ -660,7 +689,8 @@ class Team
     sig_arg_team = { @id }
     proof_klass = proofs.team_hidden.RotateKey
     chain_type = proofs.constants.seq_types.TEAM_HIDDEN
-    await @_new_team_key { link_desc, user, chain_type }, esc defer {sig_arg_kms, generation}
+    seqno = @_next_hidden_seqno()
+    await @_new_team_key { link_desc, user, chain_type, seqno }, esc defer {sig_arg_kms, generation}
     sig_arg_kms.generation = generation
     await @_forge_link_helper_hidden {link_desc, user, proof_klass, sig_arg_team, sig_arg_kms}, esc defer()
     cb null
