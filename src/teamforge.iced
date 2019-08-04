@@ -3,15 +3,44 @@
 kbpgp = require 'kbpgp'
 proofs = require 'keybase-proofs'
 constants = proofs.constants
-{prng,createHash} = require 'crypto'
+{prng,createHash,createHmac} = require 'crypto'
 {make_prng} = require './badprng'
-{PerUserSecretKeys, PerTeamSecretKeys, PerTeamKeyBoxes, PerTeamSecretKeySet, PerTeamKeyBox} = require './teamlib'
+{PerUserSecretKeys, PerTeamSecretKeys, PerTeamKeyBoxes, PerTeamSecretKeySet, PerTeamKeyBox, RatchetBlindingKey, RatchetBlindingKeySet} = require './teamlib'
 
 #===================================================
 
 assert = (condition, msg) ->
   unless condition
     throw new Error msg
+
+unhex = (x) ->
+  if Array.isArray(x) then (unhex(e) for e in x)
+  else if typeof(x) is 'string' then (Buffer.from x, 'hex')
+  else if Buffer.isBuffer(x) then x
+  else throw new Error "can't unhex: #{x.toString()}"
+
+maybe_unhex = (x) ->
+  if not x? then null
+  else if Buffer.isBuffer(x) then x
+  else unhex x
+
+compute_seed_check = ({team_id, ptsk, prev}) ->
+  prev_value = if prev? then prev.seed_check.h
+  else Buffer.concat([Buffer.from("Keybase-Derived-Team-Seedcheck-1", 'utf8'), Buffer.alloc(1), maybe_unhex(team_id)])
+  g = (seed, prev) ->
+    ret = createHmac('sha512', seed).update(prev).digest()[0...32]
+    return ret
+  new_check = g(ptsk.seed, prev_value)
+  ptsk.seed_check = {
+    h : new_check
+    v : 1
+  }
+  # recall that we send sha2 of the seed_check up to the server, to prevent the server
+  # from fabricating new seed checks by knowing old ones.
+  return {
+    h : SHA256 new_check
+    v : 1
+  }
 
 #===================================================
 
@@ -206,7 +235,7 @@ class User
 
   get_puk_kms : (cb) ->
     esc = make_esc cb, "User::get_puk_kms"
-    s = new PerUserSecretKeys { seed: (new Buffer @puk_secrets[1], 'hex'), prng: @forge.prng }
+    s = new PerUserSecretKeys { seed: (Buffer.from @puk_secrets[1], 'hex'), prng: @forge.prng }
     await s.derive {}, esc defer()
     cb null, s.kms
 
@@ -246,6 +275,8 @@ class Team
     @ptsks_list = []
     @team_key_boxes = []
     @links = []
+    @hidden_links = []
+    @ratchets = []
     cb null
 
   #-------------------
@@ -260,6 +291,8 @@ class Team
       team_key_boxes: @team_key_boxes
       debug_tk_secs: [(ptsk.seed.toString 'hex') for ptsk in @ptsks_list]
       debug_tk_sig_kids: [(ptsk.kms.signing.get_ekid().toString 'hex') for ptsk in @ptsks_list]
+      hidden : (link.for_client.bundle for link in @hidden_links)
+      ratchet_blinding_keys : (RatchetBlindingKeySet.generate(@ratchets).encode())
 
     for link in @links
       out.team_merkle[@id] =
@@ -281,8 +314,100 @@ class Team
       when 'leave'             then @_forge_link_leave             {link_desc, user}, cb
       when 'rotate_key'        then @_forge_link_rotate_key        {link_desc, user}, cb
       when 'new_subteam'       then @_forge_link_new_subteam       {link_desc, user}, cb
+      when 'rotate_key_hidden' then @_forge_link_rotate_key_hidden {link_desc, user}, cb
       when 'unsupported'       then @_forge_link_unsupported       {link_desc, user}, cb
       else cb (new Error "unhandled link type: #{link_desc.type}"), null
+
+  #-------------------
+
+  _forge_link_helper_hidden : ({link_desc, user, proof_klass, sig_arg_team, sig_arg_kms}, cb) ->
+    esc = make_esc cb, "_forge_link_helper_hidden"
+    km_sig = user.keys.default.signing
+    seqno = link_desc.hidden_seqno or @_next_hidden_seqno()
+    # the hash_meta last seen by the client who signed this link
+    # Note since 991 is prime, it's relatively prime to 1000, which we use for hash-meta hacking of
+    # the visible chain.
+    hash_meta = @forge._hash_meta 991 * seqno
+    prev = null
+    if @hidden_links.length > 0
+      prev = @hidden_links[@hidden_links.length-1].link_id
+    parent_chain_tail = null
+    if @links.length > 0
+      parent_chain_tail =
+        hash : maybe_unhex @links[@links.length-1]?.link_id
+        seqno : @links.length
+        chain_type : proofs.constants.seq_types.SEMIPRIVATE
+    sig_arg_team.is_public or= false
+    sig_arg_team.is_implicit or= false
+    ctime = 1500570000 + 1
+    sig_arg =
+      user :
+        local :
+          uid : maybe_unhex user.uid
+          eldest_seqno : 1
+      sig_eng : km_sig.make_sig_eng()
+      seqno : seqno
+      prev : maybe_unhex prev
+      ctime : ctime
+      entropy : Buffer.alloc(16)
+      merkle_root :
+        ctime: ctime
+        hash: maybe_unhex "ff".repeat 64
+        hash_meta: hash_meta
+        seqno: 8001
+      team : sig_arg_team
+      per_team_keys : [{
+        ptk_type : proofs.constants.ptk_types.reader
+        generation : sig_arg_kms.generation
+        enc_km : sig_arg_kms.encryption
+        sig_km : sig_arg_kms.signing
+        seed_check : sig_arg_kms.seed_check
+      }]
+      parent_chain_tail : parent_chain_tail
+      ignore_if_unsupported : false
+
+    if link_desc.admin?
+      sig_arg.team.admin = {
+        id : maybe_unhex link_desc.admin.id
+        seqno : link_desc.admin.seqno
+        chain_type : link_desc.admin.seq_type
+      }
+
+    proof = new proof_klass sig_arg
+    await proof.generate {}, esc defer proof_gen_out
+    link_id = SHA256 proof_gen_out.json.outer , 'hex'
+    bundle =
+      i : proof_gen_out.armored.inner
+      o : proof_gen_out.armored.outer
+      s : proof_gen_out.armored.sig
+    link_entry =
+      proof : proof
+      proof_gen_out : proof_gen_out
+      link_id : link_id
+      for_client :
+        seqno : seqno
+        uid : user.uid
+        bundle : bundle
+        version : 3
+        debug_link_id : link_id
+        debug_payload : bundle
+
+    @hidden_links.push link_entry
+
+    cb null, { link_entry }
+
+  #-------------------
+
+  _make_ratchet : (hidden) ->
+    arg = {
+      link_id : hidden.link_id
+      seqno : hidden.for_client.seqno
+      chain_type : proofs.constants.seq_types.TEAM_HIDDEN
+      prng : (i) => @forge.prng(i)
+    }
+    r = RatchetBlindingKey.generate arg
+    @ratchets.push r
+    return r
 
   #-------------------
 
@@ -297,14 +422,19 @@ class Team
       prev = @links[@links.length-1].link_id
     if link_desc.corruptors?.prev?
       prev = link_desc.corruptors?.prev prev
+    ratchet = null
+    if (hidden_prev = @hidden_links[-1...]?[0])?
+      ratchet = @_make_ratchet hidden_prev
+    ctime = 1500570000 + 1
     sig_arg =
       seqno: seqno
+      ctime : ctime
       user:
         local :
           username : user.username
           uid : user.uid
       merkle_root:
-        ctime: 1500570000 + 1
+        ctime: ctime
         hash: "ff".repeat 64
         hash_meta: hash_meta
         seqno: 8001
@@ -322,6 +452,8 @@ class Team
       sig_arg.kms = sig_arg_kms
     if link_desc.corruptors?.sig_arg?
       sig_arg = link_desc.corruptors?.sig_arg sig_arg
+    if ratchet?
+      sig_arg.team.rachets = [ ratchet.id() ]
 
     proof = new proof_klass sig_arg
     if link_desc.corruptors?.per_team_key?
@@ -407,10 +539,15 @@ class Team
 
   #-------------------
 
+  _ptk_generation : () -> @ptsks_list.length
+
+  #-------------------
+
   # generate a new per-team key and store it on the team
   # unless but_dont_save in which case no state is saved
-  _new_team_key: ({link_desc, user, but_dont_save}, cb) ->
+  _new_team_key: ({link_desc, user, but_dont_save, chain_type}, cb) ->
     esc = make_esc cb, "_new_team_key"
+    chain_type or= proofs.constants.seq_types.SEMIPRIVATE
 
     ptsk_prev = null
     if @ptsks_list.length > 0
@@ -418,6 +555,7 @@ class Team
 
     await PerTeamSecretKeys.make { prng: @forge.prng }, esc defer ptsk
     generation = @ptsks_list.length + 1
+    seed_check = compute_seed_check { ptsk, prev : @ptsks_list[-1...][0], team_id : @id }
     unless but_dont_save
       @ptsks_list.push ptsk
 
@@ -440,6 +578,7 @@ class Team
       generation: generation
       signing : ptsk.kms.signing
       encryption : ptsk.kms.encryption
+      seed_check : seed_check
 
     # early out
     if but_dont_save
@@ -460,6 +599,7 @@ class Team
 
     entry =
       seqno: seqno
+      chain_type : chain_type
       box:
         nonce: sks.nonce.at(1).buffer().toString 'base64'
         sender_kid: sender_puk_kms.encryption.get_ekid().toString 'hex'
@@ -511,6 +651,18 @@ class Team
       id : @id
     proof_klass = proofs.team.Leave
     await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
+    cb null
+
+  #-------------------
+
+  _forge_link_rotate_key_hidden : ({link_desc, user}, cb) ->
+    esc = make_esc cb, "_forge_link_rotate_key_hidden"
+    sig_arg_team = { @id }
+    proof_klass = proofs.team_hidden.RotateKey
+    chain_type = proofs.constants.seq_types.TEAM_HIDDEN
+    await @_new_team_key { link_desc, user, chain_type }, esc defer {sig_arg_kms, generation}
+    sig_arg_kms.generation = generation
+    await @_forge_link_helper_hidden {link_desc, user, proof_klass, sig_arg_team, sig_arg_kms}, esc defer()
     cb null
 
   #-------------------
@@ -597,6 +749,14 @@ class Team
   _next_seqno : ->
     if @links.length > 0
       @links[@links.length-1].for_client.seqno + 1
+    else
+      1
+
+  #-------------------
+
+  _next_hidden_seqno : ->
+    if @hidden_links.length > 0
+      @hidden_links[@hidden_links.length-1].for_client.seqno + 1
     else
       1
 

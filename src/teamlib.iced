@@ -149,7 +149,7 @@ exports.PerTeamKeyBox = class PerTeamKeyBox
   constructor : ({@uid, @per_user_key_seqno, @nonce_bottom, @box, @km}) ->
 
   @parse_throw : ({uid, box}) ->
-    v = unpack new Buffer box, 'base64'
+    v = unpack Buffer.from(box, 'base64')
     if v.length isnt 4
       throw MBPTKE("needed 4 elements in box for #{uid}; got #{v.length}")
     if v[0] isnt 1
@@ -172,7 +172,7 @@ exports.PerTeamKeyBox = class PerTeamKeyBox
   encrypt : ({encrypting_km,nonce,per_team_key,enc}, cb) ->
     esc = make_esc cb, "PerTeamKeyBox.encrypt"
     await kb.box { sign_with : encrypting_km, nonce : nonce.buffer(), encrypt_for : @km, msg : per_team_key }, esc defer box
-    @box = (unpack new Buffer box, 'base64').body.ciphertext
+    @box = (unpack Buffer.from(box, 'base64')).body.ciphertext
     @nonce_bottom = nonce.get_bottom()
     cb null, @pack(enc)
 
@@ -228,3 +228,42 @@ exports.Nonce20 = class Nonce20
   top_eq : (n2) -> bufeq_secure @top, n2.top
 
 ##=======================================================================
+
+exports.RatchetBlindingKey = class RatchetBlindingKey
+
+  constructor : ({@version, @ratchet, @blinding_key, @link_id, @seqno, @chain_type}) ->
+
+  encode_body : () -> { h : @link_id, s : @seqno, t : @chain_type }
+  encode_ratchet : () -> { k : @blinding_key, r : @ratchet }
+  encode : () -> { b : @encode_body(), r : @encode_ratchet(), v : @version }
+
+  @generate : ({link_id, seqno, chain_type, prng}) ->
+    blinding_key = prng(32)
+    ret = new RatchetBlindingKey { blinding_key, link_id, version : 1, seqno, chain_type }
+    ret.ratchet = ret.compute()
+    return ret
+
+  compute : () ->
+    h = createHmac 'sha512', @blinding_key
+    h.update pack @encode_body()
+    # should equal 'ratchet' when passed in
+    ret = h.digest()[0...32]
+    ret
+
+  id : () -> @ratchet.toString('hex')
+
+##=======================================================================
+
+exports.RatchetBlindingKeySet = class RatchetBlindingKeySet
+
+  constructor : ({@d}) ->
+
+  @generate : (ratchets) ->
+    d = {}
+    for r in ratchets
+      d[r.id()] = r
+    return new RatchetBlindingKeySet { d }
+
+  encode : () ->
+    arr = (v.encode() for _, v of @d)
+    return pack(arr).toString('base64')
