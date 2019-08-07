@@ -79,6 +79,7 @@ exports.TeamForge = class TeamForge
       merkle_triples: {} # map from keys with a dash "LeafID-HashMeta" to MerkleTriple's
       sessions: @chain.sessions
       skip : !!@chain.skip
+      load_failure : @chain.load_failure
     @_link_id_gen = new LinkIDGen
 
     # This is the user who is loading teams.
@@ -280,6 +281,7 @@ class Team
     @links = []
     @hidden_links = []
     @ratchets = []
+    @tmp_state = {}
     cb null
 
   #-------------------
@@ -384,13 +386,28 @@ class Team
     if link_desc.corruptors?.no_reverse_sig
       proof._v_reverse_sign = ({inner, outer}, cb) -> cb null, { inner, outer }
 
-    if (f = link_desc.corruptors?.reverse_sig_inputs)?
+    if (reverse_sig_inputs = link_desc.corruptors?.reverse_sig_inputs)?
       existing_hook = proof._v_reverse_sign.bind(proof)
       proof._v_reverse_sign = ({inner, outer}, cb) ->
         inner = copy_obj inner
-        f { inner, outer }
+        reverse_sig_inputs { inner, outer }
         await existing_hook { inner, outer }, defer err, res
         cb err, res
+
+    if (sig3_patch_outer = link_desc.corruptors?.sig3_patch_outer)?
+      existing_hook = proof._generate_outer.bind(proof)
+      proof._generate_outer = ({inner}) ->
+        orig = existing_hook { inner }
+        [_, decoded] = proofs.sig3.OuterLink.decode orig
+        decoded = sig3_patch_outer decoded
+        decoded.encode()
+
+    if (sig3_patch_inner = link_desc.corruptors?.sig3_patch_inner)?
+      existing_hook = proof._encode_inner.bind(proof)
+      proof._encode_inner = (opts) ->
+        json = existing_hook opts
+        json = sig3_patch_inner json
+        json
 
     await proof.generate {}, esc defer proof_gen_out
     link_id = SHA256 proof_gen_out.json.outer , 'hex'
@@ -432,8 +449,10 @@ class Team
       chain_type : proofs.constants.seq_types.TEAM_HIDDEN
       prng : (i) => @forge.prng(i)
     }
+    f(arg) if (f = link_desc.corruptors?.generate_ratchet_arg)?
     r = RatchetBlindingKey.generate arg
-    @ratchets.push r
+    f(r) if (f = link_desc.corruptors?.generated_ratchet)
+    @ratchets.push r unless link_desc.corruptors?.drop_ratchet_blinding_key
     return r
 
   #-------------------
@@ -452,7 +471,7 @@ class Team
     ratchet = null
     if (hidden_prev = @hidden_links[-1...]?[0])?
       if (f = link_desc.corruptors?.hidden_prev)?
-        hidden_prev = f hidden_prev
+        hidden_prev = f hidden_prev, @tmp_state
       ratchet = @_make_ratchet {hidden : hidden_prev, link_desc}
     ctime = 1500570000 + 1
     sig_arg =
@@ -583,9 +602,9 @@ class Team
       ptsk_prev = @ptsks_list[@ptsks_list.length-1]
 
     await PerTeamSecretKeys.make { prng: @forge.prng }, esc defer ptsk
-    generation = @ptsks_list.length + 1
+    generation = link_desc.corruptors?.ptk_gen or @ptsks_list.length + 1
     seed_check = compute_seed_check { ptsk, prev : @ptsks_list[-1...][0], team_id : @id }
-    unless but_dont_save
+    unless but_dont_save or link_desc.corruptors?.dont_save_key
       @ptsks_list.push ptsk
 
     # Create the team key box
@@ -644,7 +663,8 @@ class Team
       else
         entry.prev = 'ffff' + entry.prev.slice(4)
 
-    @team_key_boxes.push entry
+    unless link_desc.corruptors?.dont_save_key
+      @team_key_boxes.push entry
 
     cb null, {generation, sig_arg_kms}
 
