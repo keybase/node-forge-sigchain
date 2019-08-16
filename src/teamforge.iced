@@ -303,9 +303,11 @@ class Team
       out.team_merkle[@id] =
         seqno: link.for_client.seqno
         link_id: link.link_id
+        hidden_is_fresh : link.for_client.hidden_is_fresh
       out.team_merkle["#{@id}-seqno:#{link.for_client.seqno}"] =
         seqno: link.for_client.seqno
         link_id: link.link_id
+        hidden_is_fresh : link.for_client.hidden_is_fresh
 
     cb null
 
@@ -435,6 +437,7 @@ class Team
         version : 3
         debug_link_id : link_id
         debug_payload : bundle
+        hidden_is_fresh : (if link_desc.hidden_is_fresh? then link_desc.hidden_is_fresh else true)
 
     @hidden_links.push link_entry
 
@@ -545,6 +548,7 @@ class Team
         version: 2
         debug_payload: proof_gen_out.inner.obj
         debug_link_id: link_id
+        hidden_is_fresh : (if link_desc.hidden_is_fresh? then link_desc.hidden_is_fresh else true)
 
     if link_desc.mangle_payload
       link_entry.for_client.payload_json = "%%%%mangled-json%%%%%"
