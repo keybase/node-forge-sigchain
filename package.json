@@ -25,6 +25,7 @@
   "homepage": "https://github.com/keybase/node-forge-sigchain",
   "dependencies": {
     "cson": "^3.0.1",
+    "iced-coffee-script": "^108.0.13",
     "iced-error": "0.0.9",
     "iced-lock": "^1.0.1",
     "iced-logger": "0.0.6",
@@ -41,7 +42,6 @@
   "devDependencies": {
     "browserify": "^16.2.3",
     "glob": "^7.1.1",
-    "iced-coffee-script": "^108.0.13",
     "iced-test": "0.0.21",
     "icsify": "^0.7.0",
     "pgp-utils": "0.0.34",
