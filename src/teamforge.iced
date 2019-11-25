@@ -440,7 +440,7 @@ class Team
         debug_link_id : link_id
         debug_payload : bundle
         hidden_response: { 
-          resp_type: if @last_committed_hidden_tail == null then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
+          resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
           committed_hidden_tail: @last_committed_hidden_tail
           uncommitted_seqno: hidden_seqno 
         }
@@ -555,7 +555,7 @@ class Team
         debug_payload: proof_gen_out.inner.obj
         debug_link_id: link_id
         hidden_response: { 
-          resp_type: if @last_committed_hidden_tail == null then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
+          resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
           committed_hidden_tail: @last_committed_hidden_tail
           uncommitted_seqno: @_last_hidden_seqno() 
         }
