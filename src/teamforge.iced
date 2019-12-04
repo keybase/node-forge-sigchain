@@ -280,6 +280,7 @@ class Team
     @team_key_boxes = []
     @links = []
     @hidden_links = []
+    @last_committed_hidden_tail = null
     @ratchets = []
     @tmp_state = {}
     cb null
@@ -303,11 +304,11 @@ class Team
       out.team_merkle[@id] =
         seqno: link.for_client.seqno
         link_id: link.link_id
-        hidden_is_fresh : link.for_client.hidden_is_fresh
+        hidden_response: link.for_client.hidden_response
       out.team_merkle["#{@id}-seqno:#{link.for_client.seqno}"] =
         seqno: link.for_client.seqno
         link_id: link.link_id
-        hidden_is_fresh : link.for_client.hidden_is_fresh
+        hidden_response: link.for_client.hidden_response
 
     cb null
 
@@ -330,7 +331,8 @@ class Team
   _forge_link_helper_hidden : ({link_desc, user, proof_klass, sig_arg_team, sig_arg_kms}, cb) ->
     esc = make_esc cb, "_forge_link_helper_hidden"
     km_sig = user.keys.default.signing
-    seqno = link_desc.hidden_seqno or @_next_hidden_seqno()
+    hidden_seqno = link_desc.hidden_seqno or @_next_hidden_seqno()
+    seqno = @_last_seqno()
     # the hash_meta last seen by the client who signed this link
     # Note since 991 is prime, it's relatively prime to 1000, which we use for hash-meta hacking of
     # the visible chain.
@@ -346,14 +348,14 @@ class Team
         chain_type : proofs.constants.seq_types.SEMIPRIVATE
     sig_arg_team.is_public or= false
     sig_arg_team.is_implicit or= false
-    ctime = 1500570000 + 1
+    ctime = 1500570000 + 1    
     sig_arg =
       user :
         local :
           uid : maybe_unhex user.uid
           eldest_seqno : 1
       sig_eng : km_sig.make_sig_eng()
-      seqno : seqno
+      seqno : hidden_seqno
       prev : maybe_unhex prev
       ctime : ctime
       entropy : Buffer.alloc(16)
@@ -437,7 +439,11 @@ class Team
         version : 3
         debug_link_id : link_id
         debug_payload : bundle
-        hidden_is_fresh : (if link_desc.hidden_is_fresh? then link_desc.hidden_is_fresh else true)
+        hidden_response: { 
+          resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
+          committed_hidden_tail: @last_committed_hidden_tail
+          uncommitted_seqno: hidden_seqno 
+        }
 
     @hidden_links.push link_entry
 
@@ -448,7 +454,7 @@ class Team
   _make_ratchet : ({hidden, link_desc}) ->
     arg = {
       link_id : maybe_unhex hidden.link_id
-      seqno : link_desc.corruptors?.ratchet_seqno or hidden.for_client.seqno
+      seqno : link_desc.corruptors?.ratchet_seqno or hidden.for_client.hidden_response.uncommitted_seqno
       chain_type : proofs.constants.seq_types.TEAM_HIDDEN
       prng : (i) => @forge.prng(i)
     }
@@ -548,7 +554,11 @@ class Team
         version: 2
         debug_payload: proof_gen_out.inner.obj
         debug_link_id: link_id
-        hidden_is_fresh : (if link_desc.hidden_is_fresh? then link_desc.hidden_is_fresh else true)
+        hidden_response: { 
+          resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
+          committed_hidden_tail: @last_committed_hidden_tail
+          uncommitted_seqno: @_last_hidden_seqno() 
+        }
 
     if link_desc.mangle_payload
       link_entry.for_client.payload_json = "%%%%mangled-json%%%%%"
@@ -801,18 +811,28 @@ class Team
   #-------------------
 
   _next_seqno : ->
+    @_last_seqno() + 1
+
+  #-------------------
+
+  _last_seqno : ->
     if @links.length > 0
-      @links[@links.length-1].for_client.seqno + 1
+      @links[@links.length-1].for_client.seqno 
     else
-      1
+      0
 
   #-------------------
 
   _next_hidden_seqno : ->
+    @_last_hidden_seqno() + 1
+
+  #-------------------
+
+  _last_hidden_seqno : ->
     if @hidden_links.length > 0
-      @hidden_links[@hidden_links.length-1].for_client.seqno + 1
+      @hidden_links[@hidden_links.length-1].for_client.hidden_response.uncommitted_seqno
     else
-      1
+      0
 
 #===================================================
 
