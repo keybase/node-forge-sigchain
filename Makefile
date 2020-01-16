@@ -31,9 +31,6 @@ clean:
 setup:
 	npm install -d
 
-coverage:
-	./node_modules/.bin/istanbul cover $(ICED) test/run.iced
-
 test: test-server
 
 build: $(BUILD_STAMP)

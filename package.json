@@ -31,7 +31,6 @@
     "iced-logger": "0.0.6",
     "iced-runtime": "^1.0.2",
     "iced-utils": "^0.1.22",
-    "istanbul": "^0.4.5",
     "json5": "^0.4.0",
     "kbpgp": "^2.1.3",
     "keybase-bitcoinjs-lib": "^1.0.2-1",
