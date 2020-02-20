@@ -348,7 +348,7 @@ class Team
         chain_type : proofs.constants.seq_types.SEMIPRIVATE
     sig_arg_team.is_public or= false
     sig_arg_team.is_implicit or= false
-    ctime = 1500570000 + 1    
+    ctime = 1500570000 + 1
     sig_arg =
       user :
         local :
@@ -439,10 +439,10 @@ class Team
         version : 3
         debug_link_id : link_id
         debug_payload : bundle
-        hidden_response: { 
+        hidden_response: {
           resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
           committed_hidden_tail: @last_committed_hidden_tail
-          uncommitted_seqno: hidden_seqno 
+          uncommitted_seqno: hidden_seqno
         }
 
     @hidden_links.push link_entry
@@ -554,10 +554,10 @@ class Team
         version: 2
         debug_payload: proof_gen_out.inner.obj
         debug_link_id: link_id
-        hidden_response: { 
+        hidden_response: {
           resp_type: if not(@last_committed_hidden_tail?) then 2 else 3 # 2 denotes an absence proof, 3 an inclusion proof for a non nil leaf
           committed_hidden_tail: @last_committed_hidden_tail
-          uncommitted_seqno: @_last_hidden_seqno() 
+          uncommitted_seqno: @_last_hidden_seqno()
         }
 
     if link_desc.mangle_payload
@@ -692,6 +692,8 @@ class Team
       members : @_process_members_section link_desc.members
     if (invs = link_desc.completed_invites)?
       sig_arg_team.completed_invites = @_user_label_map_to_uvs invs
+    if (used_invs = link_desc.used_invites)?
+      sig_arg_team.used_invites = @_map_used_invites_to_users used_invs
     await @_forge_link_helper {link_desc, user, proof_klass, sig_arg_team}, esc defer()
     cb null
 
@@ -803,6 +805,14 @@ class Team
 
   #-------------------
 
+  _map_used_invites_to_users : (used_invites) ->
+    return used_invites.map ({uv, id}) =>
+      user = @forge.users[uv]
+      unless user? then throw new Error("couldn't find user in used_invites: #{uv}")
+      return { id, uv: user.uv_str() }
+
+  #-------------------
+
   _hash_team_id : (team_name) ->
     h = SHA256(team_name.toLowerCase())[0...15]
     id = h.toString('hex') + "24"
@@ -817,7 +827,7 @@ class Team
 
   _last_seqno : ->
     if @links.length > 0
-      @links[@links.length-1].for_client.seqno 
+      @links[@links.length-1].for_client.seqno
     else
       0
 
