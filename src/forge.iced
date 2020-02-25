@@ -20,6 +20,15 @@ username_to_uid = (un) ->
 
 #===================================================
 
+add_client = (arg) ->
+  arg.client = {
+    version : "5.2.30"
+    name : "keybase.io go client"
+  }
+  arg
+
+#===================================================
+
 # most of this copy-pasted from keybase-proofs, but I didn't want to
 # introduce this code into that repo, since it's only for crafting
 # malicious proofs -- MK 2017/4/3
@@ -36,7 +45,7 @@ generate_v2_with_corruption = ({links,proof, opts, hooks}, cb) ->
   res = {}
   hooks.post_generate_outer? { links, proof, outer, inner, res }
   outer = res.outer if res.outer?
-  await proof.sig_eng.box outer, esc defer {pgp, raw, armored}
+  await proof.sig_eng.box outer, esc(defer({pgp, raw, armored})), { dohash : true }
   hooks.corrupt_box? { inner, outer, pgp, raw, armored }
   {short_id, id} = proofs.make_ids raw
   out = { inner, outer, pgp, raw, armored, short_id, id, links, outer_unpacked }
@@ -70,7 +79,7 @@ generate_v1_with_corruption = ({links,proof,opts,hooks}, cb) ->
 
   inner = { str : json, obj : json_obj }
 
-  await proof.sig_eng.box json, esc defer {pgp, raw, armored}
+  await proof.sig_eng.box json, esc(defer({pgp, raw, armored})), { dohash : true}
   {short_id, id} = proofs.make_ids raw
   out = { pgp, json, id, short_id, raw, armored, inner }
   cb null, out
@@ -83,7 +92,7 @@ generate_proof = ({links, proof, linkdesc}, cb) ->
   else if (hooks = linkdesc.corrupt_v1_proof_hooks)? # v1 hooks
     generate_v1_with_corruption { links, proof, opts : {}, hooks }, cb
   else
-    proof.generate_versioned { version : linkdesc.version}, cb
+    proof.generate_versioned { version : linkdesc.version, dohash : true }, cb
 
 #===================================================
 
@@ -305,7 +314,7 @@ exports.Forge = class Forge
   _forge_eldest_link : ({linkdesc}, cb) ->
     esc = make_esc cb, "_forge_eldest_link"
     await @_gen_key { obj : linkdesc, required : true }, esc defer key
-    proof = new proofs.Eldest {
+    proof = new proofs.Eldest add_client {
       sig_eng : key.km.make_sig_eng()
     }
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
@@ -321,12 +330,13 @@ exports.Forge = class Forge
     unless parent?
       err = new Error "Unknown parent '#{ref}' in link '#{linkdesc.label}'"
       await athrow err, esc defer()
-    proof = new proofs.Subkey {
+    arg = {
       subkm : key.km
       sig_eng : parent.km.make_sig_eng()
       parent_kid : parent.km.get_ekid().toString 'hex'
       eldest_kid : @_eldest_kid
     }
+    proof = new proofs.Subkey add_client arg
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
@@ -339,11 +349,12 @@ exports.Forge = class Forge
     unless signer?
       err = new Error "Unknown signer '#{ref}' in link '#{linkdesc.label}'"
       await athrow err, esc defer()
-    proof = new proofs.Sibkey {
+    arg = {
       sibkm : key.km
       sig_eng : signer.km.make_sig_eng()
       eldest_kid : @_eldest_kid
     }
+    proof = new proofs.Sibkey add_client arg
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
@@ -383,7 +394,7 @@ exports.Forge = class Forge
     if linkdesc.revoke?
       await @_forge_revoke_section { revoke, linkdesc }, esc defer()
       arg.revoke = revoke
-    proof = new proofs.Cryptocurrency arg
+    proof = new proofs.Cryptocurrency add_client arg
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
@@ -405,7 +416,7 @@ exports.Forge = class Forge
       args.revoke = raw
     else
       await @_forge_revoke_section { linkdesc, revoke }, esc defer()
-    proof = new proofs.Revoke args
+    proof = new proofs.Revoke add_client args
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
 
@@ -494,7 +505,7 @@ exports.Forge = class Forge
       encryption : ekm.km
       signing : skm.km
     arg.generation = 1
-    proof = new proofs.PerUserKey arg
+    proof = new proofs.PerUserKey add_client arg
 
     await @_sign_and_commit_link { linkdesc, proof }, esc defer()
     cb null
@@ -548,4 +559,3 @@ exports.Forge = class Forge
     cb null, ret
 
 #===================================================
-

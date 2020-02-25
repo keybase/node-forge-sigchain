@@ -983,7 +983,26 @@ jsonparse@^1.2.0:
   resolved "https://registry.yarnpkg.com/jsonparse/-/jsonparse-1.3.1.tgz#3f4dae4a91fac315f71062f8521cc239f1366280"
   integrity sha1-P02uSpH6wxX3EGL4UhzCOfE2YoA=
 
-kbpgp@>=2.1.7, kbpgp@^2.0.0, kbpgp@^2.1.3:
+kbpgp@>=2.1.13, kbpgp@^2.1.13:
+  version "2.1.13"
+  resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.1.13.tgz#5aef69330ccf1c8896910ff9d50544f1b391fb62"
+  integrity sha512-57ryh9TrOhkSqMXzaXsSJgffn11Qkkc960Wj9UzdNln6wERxesIbGoDBYCtlikvYZ/G5SscRNnXEP4Vx8lqKvQ==
+  dependencies:
+    bn "^1.0.5"
+    bzip-deflate "^1.0.0"
+    deep-equal "^1.1.0"
+    iced-error "0.0.13"
+    iced-lock "^1.0.2"
+    iced-runtime "^1.0.4"
+    keybase-ecurve "^1.0.1"
+    keybase-nacl "^1.1.2"
+    minimist "^1.2.0"
+    pgp-utils "0.0.35"
+    purepack "^1.0.5"
+    triplesec "^4.0.3"
+    tweetnacl "^0.13.1"
+
+kbpgp@^2.0.0:
   version "2.1.7"
   resolved "https://registry.yarnpkg.com/kbpgp/-/kbpgp-2.1.7.tgz#8f24bf926c18201cedd20d1776eade7067fdde89"
   integrity sha512-UwIbS38NGw8pny3Y5REthmQMrq4bJoVmvrvY/SBKyrulH72KloKhPVZ1lfm0OX6WzD28Au1s7BysCRYjAZEpqg==
@@ -1030,16 +1049,16 @@ keybase-nacl@^1.1.2:
     tweetnacl "^0.13.1"
     uint64be "^1.0.1"
 
-keybase-proofs@^2.3.7:
-  version "2.3.15"
-  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.3.15.tgz#b376eeae9da2b6f5ff5487b24c500c7f4554e91a"
-  integrity sha512-vV4HHi8u5JX7yP08op3u7umVJWia8kURhFJSaJxVDuyTcCy0f8Q16XFhc8WtJ3OjA2NBRGuP4tglaQnFZgCQ1Q==
+keybase-proofs@^2.3.21:
+  version "2.3.21"
+  resolved "https://registry.yarnpkg.com/keybase-proofs/-/keybase-proofs-2.3.21.tgz#3d92dee81845f53bc8823f782230aec88e58a163"
+  integrity sha512-iZed+M48pWDZy+2B+DmOJ5OSz4AXl0eTXFjm7jXaKJA7zjztOncszWmNzbjbdE031BiYoStW0RGpUs4/PJqaEg==
   dependencies:
     bitcoyne "^1.0.5"
     iced-error ">=0.0.9"
     iced-lock "^1.0.1"
     iced-runtime ">=0.0.1"
-    kbpgp ">=2.1.7"
+    kbpgp ">=2.1.13"
     pgp-utils ">=0.0.22"
     purepack "^1.0.4"
     triplesec ">=3.0.16"

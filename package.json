@@ -32,9 +32,9 @@
     "iced-runtime": "^1.0.2",
     "iced-utils": "^0.1.22",
     "json5": "^0.4.0",
-    "kbpgp": "^2.1.3",
+    "kbpgp": "^2.1.13",
     "keybase-bitcoinjs-lib": "^1.0.2-1",
-    "keybase-proofs": "^2.3.7",
+    "keybase-proofs": "^2.3.21",
     "minimist": "^1.1.1",
     "tweetnacl": "^0.13.1"
   },
